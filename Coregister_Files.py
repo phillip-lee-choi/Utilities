@@ -259,19 +259,20 @@ def deg2utm(lon,lat):
 def main():
     matplotlib.use('Agg')
     parser = argparse.ArgumentParser()
-    parser.add_argument('dem_file', help="Path to DEM file")
-    parser.add_argument('csv_file', help="Path to txt/csv file")
-    parser.add_argument('output_dir', nargs='?')
+    parser.add_argument('--raster', help="Path to DEM file")
+    parser.add_argument('--csv', help="Path to txt/csv file")
+    parser.add_argument('--output_dir', nargs='?')
+    parser.add_argument('--max_iters',default='20',nargs='?')
     args = parser.parse_args()
 
-    d = vars(args)
+    
 
-    dem_path = d['dem_file']
-    csv_path = d['csv_file']
-    output_dir = d['output_dir']
+    dem_path = args.raster
+    csv_path = args.csv
+    output_dir = args.output_dir
+    max_iter = int(args.max_iter)
 
     tmp_dir = '/BhaltosMount/Bhaltos/EDUARD/tmp/'
-    max_iter = 20
 
     if os.getcwd() == '/':
         print('Don\'t run this in "/" directory!')
