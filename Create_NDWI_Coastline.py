@@ -118,8 +118,8 @@ def main():
 
     ndwi_lt_0p0_floodfill = flood_fill(ndwi_lt_0p0)
     write_file(ndwi_lt_0p0_floodfill,output_file_floodfill,src)
-    nodata_command = f'gdal_translate -a_nodata 0 -of GTiff -co "COMPRESS=LZW" {output_file_floodfill} {output_file_floodfill_nodata}'
-    polygonize_command = f'gdal_polygonize.py {output_file_floodfill_nodata} -f "ESRI Shapefile" {output_file_floodfill_shp}'
+    nodata_command = f'gdal_translate -q -a_nodata 0 -of GTiff -co "COMPRESS=LZW" {output_file_floodfill} {output_file_floodfill_nodata}'
+    polygonize_command = f'gdal_polygonize.py -q {output_file_floodfill_nodata} -f "ESRI Shapefile" {output_file_floodfill_shp}'
     subprocess.run(nodata_command,shell=True)
     subprocess.run(polygonize_command,shell=True)
     subprocess.run(f'rm {output_file_floodfill}',shell=True)
