@@ -81,6 +81,13 @@ def remove_interior_holes_polygon(geom,threshold):
         new_geom = geom
     return new_geom
 
+def simplify_polygon(geom,threshold):
+    '''
+    Simplifies the polygon
+    '''
+    new_geom = geom.simplify(threshold)
+    return new_geom
+
 def main():
     '''
     Write by Eduard Heijkoop, University of Colorado
@@ -96,11 +103,13 @@ def main():
     NDWI_THRESHOLD = 0.0
     SHP_POLYGON_THRESHOLD = 0.005
     INTERIOR_THRESHOLD = 50000
+    SIMPLIFY_RADIUS = 20
 
     output_file_floodfill = input_file.replace('.tif','_floodfill.tif')
     output_file_floodfill_nodata = output_file_floodfill.replace('.tif','_nodata_0.tif')
     output_file_floodfill_shp = output_file_floodfill.replace('.tif','.shp')
     output_file_shp = input_file.replace('.tif','.shp')
+    output_file_shp_simplified = output_file_shp.replace('.shp','_simplified.shp')
 
     src = gdal.Open(input_file,gdalconst.GA_ReadOnly)
     ndwi = np.array(src.GetRasterBand(1).ReadAsArray())
@@ -127,8 +136,14 @@ def main():
     gdf = gdf.iloc[idx_area].reset_index(drop=True)
 
     gdf['geometry'] = gdf.apply(lambda x : remove_interior_holes_polygon(x.geometry,INTERIOR_THRESHOLD),axis=1)
+
+    gdf_simplified = gdf
+    gdf_simplified['geometry'] = gdf_simplified.apply(lambda x : simplify_polygon(x.geometry,SIMPLIFY_RADIUS),axis=1)
+
     gdf = gdf.to_crs('EPSG:4326')
     gdf.to_file(output_file_shp)
+    gdf_simplified = gdf_simplified.to_crs('EPSG:4326')
+    gdf_simplified.to_file(output_file_shp_simplified)
     subprocess.run(f'rm {output_file_floodfill_shp.replace(".shp",".*")}',shell=True)
 
 if __name__ == '__main__':
