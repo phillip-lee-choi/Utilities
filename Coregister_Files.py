@@ -262,7 +262,7 @@ def main():
     parser.add_argument('--raster', help="Path to DEM file")
     parser.add_argument('--csv', help="Path to txt/csv file")
     parser.add_argument('--output_dir', nargs='?')
-    parser.add_argument('--max_iters',default='20',nargs='?')
+    parser.add_argument('--max_iter',default='20',nargs='?')
     args = parser.parse_args()
 
     
