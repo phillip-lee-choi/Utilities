@@ -368,8 +368,8 @@ def download_img_google_drive(filename,output_folder,tmp_dir,token_json,credenti
             f = open(f'{tmp_dir}{filename}','wb')
             f.write(download_code)
             f.close()
-            return None
-    return 0
+            return 0
+    return None
 
 def get_idx_subset_day(t_full,t_select):
     t_day = np.asarray([t[:10] for t in t_full])
@@ -379,8 +379,8 @@ def get_idx_subset_day(t_full,t_select):
 def polygonize_tif(img):
     img_nodata = img.replace('.tif','_nodata_0.tif')
     shp = img.replace('.tif','.shp')
-    nodata_command = f'gdal_translate -a_nodata 0 {img} {img_nodata}'
-    polygonize_command = f'gdal_polygonize.py {img_nodata} -f "ESRI Shapefile" {shp}'
+    nodata_command = f'gdal_translate -q -a_nodata 0 {img} {img_nodata}'
+    polygonize_command = f'gdal_polygonize.py -q {img_nodata} -f "ESRI Shapefile" {shp}'
     subprocess.run(nodata_command,shell=True)
     subprocess.run(polygonize_command,shell=True)
     return shp
@@ -399,7 +399,7 @@ def main():
     config.read(config_file)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_file',default='/media/heijkoop/DATA/DEM/Accuracy_Assessment/Strip/Rural/US_Savannah_ATL03_Rural_Strip.txt',help='Path to csv to filter')
+    parser.add_argument('--input_file',help='Path to csv to filter')
     args = parser.parse_args()
     input_file = args.input_file
 
@@ -432,6 +432,7 @@ def main():
     loc_name = input_file.split('/')[-1].split('_ATL03')[0]
     output_folder_gdrive = f'GEE_{loc_name}'
 
+    t_start_full = datetime.datetime.now()
     for i in range(len(gdf_conv_hull)):
         print(f'{i+1}/{len(gdf_conv_hull)}')
         t_start = datetime.datetime.now()
@@ -448,7 +449,7 @@ def main():
             continue
         t_end = datetime.datetime.now()
         dt = t_end - t_start
-        print(f'Processing time: {dt.seconds + dt.microseconds/1e6:.1f} s.')
+        print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
 
         '''
         Access that particular file from Google Drive
@@ -461,7 +462,7 @@ def main():
         write out filtered csv
         Concatenate all filtered csvs into one csv
         '''
-
+        t_start = datetime.datetime.now()
         download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
         if download_code is None:
             print('Could not download image from Google Drive.')
@@ -484,11 +485,20 @@ def main():
 
         output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
         np.savetxt(output_file,np.c_[lon_masked,lat_masked,height_masked,time_masked.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
+        t_end = datetime.datetime.now()
+        dt = t_end - t_start
+        print(f'Applying filter took {dt.seconds + dt.microseconds/1e6:.1f} s.')
     
     file_list = sorted(glob.glob(f'{tmp_dir}{loc_name}_*_Filtered_NDVI_NDWI.txt'))
     output_full_file = input_file.replace('.txt','_Filtered_NDVI_NDWI.txt')
     cat_command = f'cat {" ".join(file_list)} > {output_full_file}'
     subprocess.run(cat_command,shell=True)
+    t_end_full = datetime.datetime.now()
+    dt_full = t_end_full - t_start_full
+    if dt_full.seconds > 3600:
+        print(f'{loc_name} took {np.floor(dt_full.seconds/3600).astype(int)} hour(s), {np.floor(dt_full.seconds/60).astype(int)} minute(s), {np.mod(dt_full.seconds,60) + dt_full.microseconds/1e6:.1f} s.')
+    else:
+        print(f'{loc_name} took {np.floor(dt_full.seconds/60).astype(int)} minute(s), {np.mod(dt_full.seconds,60) + dt_full.microseconds/1e6:.1f} s.')
 
 if __name__ == '__main__':
     main()
