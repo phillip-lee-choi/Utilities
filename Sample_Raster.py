@@ -9,11 +9,17 @@ import sys
 from osgeo import gdal,gdalconst,osr
 
 def detect_header(csv_file):
+    '''
+    Detects if a csv file has a header line or not
+    '''
     with open(csv_file,'r') as f:
         has_header = csv.Sniffer().has_header(f.read(1024))
     return has_header
 
 def find_lonlat_headers(csv_file):
+    '''
+    Finds longitude and latitude headers in a csv file.
+    '''
     lon_checklist = ['lon','longitude','long']
     lat_checklist = ['lat','latitude','latt']
     idx_lon,idx_lat = find_headers(csv_file,lon_checklist,lat_checklist)
@@ -22,6 +28,9 @@ def find_lonlat_headers(csv_file):
     return idx_lon,idx_lat
 
 def find_xy_headers(csv_file):
+    '''
+    Finds x and y headers in a csv file.
+    '''
     x_checklist = ['x','easting','east']
     y_checklist = ['y','northing','north']
     idx_x,idx_y = find_headers(csv_file,x_checklist,y_checklist)
@@ -30,6 +39,9 @@ def find_xy_headers(csv_file):
     return idx_x,idx_y
 
 def find_headers(csv_file,lon_checklist,lat_checklist):
+    '''
+    Finds the columns corresponding to the lon/x and lat/y headers in a csv file.
+    '''
     csv_head = subprocess.check_output(f'head -n 1 {csv_file}', shell=True).decode('utf-8').strip().split('\n')
     headers = csv_head[0].split('\t')[0].split(',')
     headers = np.asarray([h.strip().lower().split(' ')[0] for h in headers])
@@ -48,6 +60,9 @@ def find_headers(csv_file,lon_checklist,lat_checklist):
     return idx_lon,idx_lat
 
 def deg2utm(lon,lat):
+    '''
+    Converts longitude and latitude to UTM coordinates.
+    '''
     pi = np.math.pi
     n1 = np.asarray(lon).size
     n2 = np.asarray(lat).size
@@ -140,12 +155,18 @@ def deg2utm(lon,lat):
     return x, y, utmzone
 
 def get_epsg(input_file):
+    '''
+    Returns the EPSG code of the input file.
+    '''
     src = gdal.Open(input_file)
     proj = osr.SpatialReference(wkt=src.GetProjection())
     epsg = proj.GetAttrValue('AUTHORITY',1)
     return epsg
 
 def utm2epsg(utm_code,north_south_flag=False):
+    '''
+    Converts a UTM zone to ESPSG code.
+    '''
     utm_code = np.asarray([z.replace(' ','') for z in utm_code])
     lat_band_number = np.asarray([ord(u[2].upper()) for u in utm_code])
     if north_south_flag == True:
@@ -163,7 +184,8 @@ def utm2epsg(utm_code,north_south_flag=False):
 
 def find_column_12_21(csv,raster,nodata_value=-9999,geolocation='wgs84'):
     ''''
-    Assumes that the csv has spatial coordinates in first two columns
+    Finds lon/lat columns of a csv without a header.
+    Assumes that the csv has spatial coordinates in first two columns.
     '''
     gdallocationinfo_input_12 = subprocess.check_output(f"cat {csv} | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -{geolocation} {raster}",shell=True).decode('utf-8').split('\n')
     gdallocationinfo_input_12 = np.asarray(gdallocationinfo_input_12,dtype='<U18')
@@ -261,45 +283,6 @@ def main():
         subprocess.run(f"sed -i '/nan/d' {output_file}",shell=True)
         subprocess.run(f"awk -F, '${n_column_sampled}!=\"\"' {output_file} > tmp.txt",shell=True)
         subprocess.run(f'mv tmp.txt {output_file}',shell=True)
-
-
-
-'''
-cat /media/heijkoop/DATA/DEM/Accuracy_Assessment/Strip/Rural/US_Savannah_ATL03_Rural_Strip.txt | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -wgs84 /media/heijkoop/DATA/DEM/Accuracy_Assessment/Strip/Rural/WV01_20190126_1020010082E41B00_1020010083282500_2m_lsf_seg4_dem.tif > tmp_orig.txt
-
-
-
-input_file = '/media/heijkoop/DATA/DEM/Locations/US_Savannah/ICESat-2/US_Savannah_Full_Mosaic_1_Sampled_ICESat2.txt'
-df = pd.read_csv(input_file,header=None,names=['lon','lat','height_icesat2','time','height_dem'],dtype={'lon':'float','lat':'float','height_icesat2':'float','time':'str','height_dem':'float'})
-lon = np.asarray(df.lon)
-lat = np.asarray(df.lat)
-height_icesat2 = np.asarray(df.height_icesat2)
-time = np.asarray(df.time)
-height_dem = np.asarray(df.height_dem)
-
-idx_nan = np.isnan(height_dem)
-idx_9999 = height_dem == -9999
-idx_filter = ~np.any((idx_nan,idx_9999),axis=0)
-
-lon_filtered = lon[idx_filter]
-lat_filtered = lat[idx_filter]
-height_icesat2_filtered = height_icesat2[idx_filter]
-time_filtered = time[idx_filter]
-height_dem_filtered = height_dem[idx_filter]
-
-dh_filtered = height_dem_filtered - height_icesat2_filtered
-rmse = np.sqrt(np.sum(dh_filtered**2)/len(dh_filtered))
-
-time_filtered_datetime = np.asarray([datetime.datetime.strptime(t,'%Y-%m-%d %H:%M:%S.%f') for t in time_filtered])
-date_filtered = np.asarray([t.date() for t in time_filtered_datetime])
-unique_dates = np.unique(date_filtered)
-
-rmse_date = np.zeros((len(unique_dates)))
-for i in range(len(unique_dates)):
-    idx_date = date_filtered == unique_dates[i]
-    dh_tmp = dh_filtered[idx_date]
-    rmse_date[i] = np.sqrt(np.sum(dh_tmp**2)/len(dh_tmp))
-'''
 
 if __name__ == '__main__':
     main()
