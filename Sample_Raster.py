@@ -227,6 +227,7 @@ def main():
         output_file = f'{os.path.splitext(csv_path)[0]}_Sampled_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(csv_path)[1]}'
     
     if standard_flag == True:
+        csv_has_header = False
         cat_command = f"cat {csv_path} | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -wgs84 {raster_path} > tmp.txt"
     else:
         csv_has_header = detect_header(csv_path)
