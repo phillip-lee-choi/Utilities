@@ -127,7 +127,7 @@ def main():
         lat_filtered = np.asarray(df_sampled_filtered.lat)
         height_icesat2_filtered = np.asarray(df_sampled_filtered.height_icesat2)
         time_filtered = np.asarray(df_sampled_filtered.time)
-        output_csv = f'{os.path.splitext(csv_path)[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}{os.path.splitext(csv_path)[1]}'
+        output_csv = f'{os.path.splitext(csv_path)[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
         np.savetxt(output_csv,np.c_[lon_filtered,lat_filtered,height_icesat2_filtered,time_filtered.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
 
     if resample_flag == True:
