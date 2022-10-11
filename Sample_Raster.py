@@ -218,9 +218,9 @@ def main():
     filter_flag = args.filter
     lonlat_flag = args.lonlat
     latlon_flag = args.latlon
-    utm_flat = args.utm
+    utm_flag = args.utm
 
-    if np.sum((lonlat_flag,latlon_flag,utm_flat)) > 1:
+    if np.sum((lonlat_flag,latlon_flag,utm_flag)) > 1:
         print('Please choose one coordinate system.')
         sys.exit()
     if output_file is None:
