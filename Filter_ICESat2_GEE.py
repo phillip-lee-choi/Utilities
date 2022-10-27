@@ -100,8 +100,18 @@ def get_NDVI(s2_image):
     return ndvi
 
 def get_NDWI(s2_image):
-    ndwi = s2_image.normalizedDifference(['B8','B3']).rename('NDWI')
+    ndwi = s2_image.normalizedDifference(['B3','B8']).rename('NDWI')
     return ndwi
+
+def getANDWI(s2_image):
+    red = s2_image.select('B4')
+    green = s2_image.select('B3')
+    blue = s2_image.select('B2')
+    nir = s2_image.select('B8')
+    swir1 = s2_image.select('B11')
+    swir2 = s2_image.select('B12')
+    andwi = (red.add(green).add(blue).subtract(nir).subtract(swir1).subtract(swir2)).divide(red.add(green).add(blue).add(nir).add(swir1).add(swir2)).rename('ANDWI')
+    return andwi
 
 def get_NDSI(s2_image):
     ndsi = s2_image.normalizedDifference(['B11','B3']).rename('NDSI')
@@ -119,13 +129,23 @@ def get_NDVI_threshold(s2_image,NDVI_THRESHOLD):
     return s2_image.normalizedDifference(['B8','B4']).lt(NDVI_THRESHOLD)
 
 def get_NDWI_threshold(s2_image,NDWI_THRESHOLD):
-    return s2_image.normalizedDifference(['B8','B3']).gt(NDWI_THRESHOLD)
+    return s2_image.normalizedDifference(['B3','B8']).gt(NDWI_THRESHOLD)
 
 def get_NDSI_threshold(s2_image,NDSI_THRESHOLD):
     return s2_image.normalizedDifference(['B11','B3']).gt(NDSI_THRESHOLD)
 
 def get_NDVI_NDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD):
-    return s2_image.normalizedDifference(['B8','B4']).lt(NDVI_THRESHOLD).multiply(s2_image.normalizedDifference(['B8','B3']).gt(NDWI_THRESHOLD))
+    return s2_image.normalizedDifference(['B8','B4']).lt(NDVI_THRESHOLD).multiply(s2_image.normalizedDifference(['B3','B8']).lt(NDWI_THRESHOLD))
+
+def get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD):
+    red = s2_image.select('B4')
+    green = s2_image.select('B3')
+    blue = s2_image.select('B2')
+    nir = s2_image.select('B8')
+    swir1 = s2_image.select('B11')
+    swir2 = s2_image.select('B12')
+    andwi = (red.add(green).add(blue).subtract(nir).subtract(swir1).subtract(swir2)).divide(red.add(green).add(blue).add(nir).add(swir1).add(swir2)).rename('ANDWI')
+    return s2_image.normalizedDifference(['B8','B4']).lt(NDVI_THRESHOLD).multiply(andwi.lt(NDWI_THRESHOLD))
 
 def clip_to_geometry(s2_image,geometry):
     return s2_image.clip(geometry)
@@ -441,7 +461,7 @@ def main():
         if s2_image is None:
             print('No suitable Sentinel-2 data.')
             continue
-        ndvi_ndwi_threshold = get_NDVI_NDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
+        ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
         ndvi_ndwi_threshold_filename = f'{loc_name}_ATL03_{i2_ymd}_S2_{s2_ymd}_NDVI_NDWI_threshold.tif'
         export_code = export_to_drive(ndvi_ndwi_threshold,ndvi_ndwi_threshold_filename,s2_geometry,loc_name)
         if export_code is None:
