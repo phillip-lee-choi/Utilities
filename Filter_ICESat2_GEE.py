@@ -199,7 +199,7 @@ def csv_to_convex_hull_shp(df,csv_file,writing=True):
     idx_sorted = np.sort(idx)
     idx_sorted = np.append(idx_sorted,len(df))
     gdf = gpd.GeoDataFrame()
-    for i in range(len(day_list_cleaned)-1):
+    for i in range(len(day_list_cleaned)):
         day_str = day_list_cleaned[i]
         lonlat = np.column_stack((lon[idx_sorted[i]:idx_sorted[i+1]],lat[idx_sorted[i]:idx_sorted[i+1]]))
         if len(lonlat) == 1:
