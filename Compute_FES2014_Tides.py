@@ -56,8 +56,8 @@ def main():
     parser.add_argument('--output_file',help='Output file')
     parser.add_argument('--plot',help='Plot',action='store_true')
     args = parser.parse_args()
-    lon = args.lon
-    lat = args.lat
+    lon = float(args.lon)
+    lat = float(args.lat)
     t_start = datetime.datetime.strptime(args.t_start,'%Y-%m-%d %H:%M:%S')
     t_end = datetime.datetime.strptime(args.t_end,'%Y-%m-%d %H:%M:%S')
     t_resolution = args.resolution
@@ -79,7 +79,7 @@ def main():
         plt.plot(date_range_datetime,fes2014_heights)
         plt.xlabel('Time')
         plt.ylabel('Height (m)')
-        plt.set_title(f'FES2014 Tidal heights at lon: {lon:.3f}, lat: {lat:.3f}')
+        plt.title(f'FES2014 Tidal heights at lon: {lon:.3f}, lat: {lat:.3f}')
         plt.show()
 
 
