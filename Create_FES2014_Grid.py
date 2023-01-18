@@ -56,7 +56,7 @@ def main():
     lonlat_resolution = float(args.lonlat_resolution)
     t_start = datetime.datetime.strptime(args.t_start,'%Y-%m-%d %H:%M:%S')
     t_end = datetime.datetime.strptime(args.t_end,'%Y-%m-%d %H:%M:%S')
-    t_resolution = float(args.resolution)
+    t_resolution = float(args.t_resolution)
     model_dir = args.model_dir
     output_file = args.output_file
     plot_flag = args.plot
