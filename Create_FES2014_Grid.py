@@ -75,7 +75,7 @@ def main():
     lat = lat.flatten()
     fes2014_heights = np.zeros(len(lon))
     for i in range(len(lon)):
-        tides = compute_tides(lon,lat,date_range_datetime,model_dir)
+        tides = compute_tides(lon[i],lat[i],date_range_datetime,model_dir)
         if tides is not None:
             fes2014_heights[i] = np.max(tides)
         else:
