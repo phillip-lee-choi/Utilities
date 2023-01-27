@@ -369,14 +369,16 @@ def main():
     
     if buffer_flag == True:
         res = 'i'
-        area_threshold = 1e-1
-        buffer_dist = 3
+        area_threshold = 1e8
+        buffer_dist = 500e3
         coast_dir = config.get('COAST','coast_dir')
         coast_shp = f'{coast_dir}/{res}/GSHHS_{res}_L1.shp'
         landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
         gdf_coast = gpd.read_file(coast_shp)
+        gdf_coast = gdf_coast.to_crs('EPSG:3857')
         gdf_coast = gdf_coast[gdf_coast.area > area_threshold]
         gdf_coast = gdf_coast.buffer(buffer_dist)
+        gdf_coast = gdf_coast.to_crs('EPSG:4326')
         lon_coast,lat_coast = get_lonlat_gdf(gdf_coast)
         landmask = landmask_pts(lon_array,lat_array,lon_coast,lat_coast,landmask_c_file,inside_flag=1)
         lon_array = lon_array[landmask == 1]
