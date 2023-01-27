@@ -403,3 +403,6 @@ def main():
     #         fes2014_grid[i,j] = np.max(tides)
 
     np.savetxt(output_file,np.c_[lon_array,lat_array,tide_min,tide_max],fmt='%.4f,%.4f,%.4f,%.4f',delimiter=',',header=None)
+
+if __name__ == '__main__':
+    main()
