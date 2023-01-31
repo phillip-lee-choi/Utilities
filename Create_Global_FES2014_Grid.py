@@ -363,16 +363,19 @@ def main():
     m2_data = nc.Dataset(m2_file)
     lon = np.asarray(m2_data['lon'][:])
     lat = np.asarray(m2_data['lat'][:])
-    lon = np.append(lon,360.0)
+    lon = lon = np.concatenate(([-180.0],lon[2881:]-360,lon[:2881]))
     phase_mask = np.asarray(m2_data['phase'][:].mask).astype(int)
+    phase_mask = np.concatenate((np.atleast_2d(phase_mask[:,2880]).T,phase_mask[:,2881:],phase_mask[:,:2881]),axis=1)
     lon_mesh,lat_mesh = np.meshgrid(lon,lat)
     lon_array = lon_mesh.flatten()
     lat_array = lat_mesh.flatten()
-    lon_array[lon_array>180] -= 360
+    phase_mask = phase_mask.flatten()
+    lon_array = lon_array[phase_mask==0]
+    lat_array = lat_array[phase_mask==0]
     
     if buffer_flag == True:
-        res = 'i'
-        area_threshold = 1e8
+        res = 'h'
+        area_threshold = 5e6
         buffer_dist = 500e3
         x_max_3857 = 20037508.342789244
         antimeridian = shapely.geometry.LineString([[180.0,90.0],[180.0,-90.0]])
@@ -387,7 +390,6 @@ def main():
         gdf_coast = gdf_coast[idx_area_threshold]
         gdf_coast = gdf_coast.buffer(buffer_dist)
         gdf_coast = gpd.GeoDataFrame(geometry=[gdf_coast.unary_union],crs='EPSG:3857')
-        # gdf_coast = gdf_coast.to_crs('EPSG:4326')
         tmp_gdf = gpd.GeoDataFrame()
         for i in range(len(gdf_coast)):
             tmp_gdf = gpd.GeoDataFrame(pd.concat([tmp_gdf,gpd.GeoDataFrame(geometry=[p for p in gdf_coast.geometry[i].geoms],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
@@ -435,7 +437,7 @@ def main():
                     idx_dist = np.array([0,len(x_outside)])
                 else:
                     idx_dist = idx_dist[np.asarray([idx not in idx_buffer_dist for idx in idx_dist])]
-                    idx_dist = np.append(0,idx_dist+1,len(x_outside))
+                    idx_dist = np.concatenate(([0],idx_dist+1,[len(x_outside)]))
                 for j in range(len(idx_dist)-1):
                     x_segment = x_outside[idx_dist[j]:idx_dist[j+1]]
                     y_segment = y_outside[idx_dist[j]:idx_dist[j+1]]
@@ -454,7 +456,7 @@ def main():
         gdf_buffered_filtered = tmp_gdf.copy()
         gdf_buffered_filtered = gdf_buffered_filtered.to_crs('EPSG:4326')
         lon_coast,lat_coast = get_lonlat_gdf(gdf_buffered_filtered)
-        landmask = landmask_pts(lon_array,lat_array,lon_coast,lat_coast,landmask_c_file,inside_flag=0)
+        landmask = landmask_pts(lon_array,lat_array,lon_coast,lat_coast,landmask_c_file,inside_flag=1)
         lon_array = lon_array[landmask == 1]
         lat_array = lat_array[landmask == 1]
     
