@@ -275,15 +275,11 @@ def compute_minor_tide(zmajor,f_costh,f_sinth,n,constituent_reorder,minor_indice
     return minor_tide
 
 
-
 def compute_tides(lon,lat,utc_time,model_dir):
     '''
     Assumes utc_time is in datetime format
     lon/lat as flattened meshgrid arrays
     '''
-    # lon_mesh,lat_mesh = np.meshgrid(lon,lat)
-    # lon_array = lon_mesh.flatten()
-    # lat_array = lat_mesh.flatten()
     delta_file = pyTMD.utilities.get_data_path(['data','merged_deltat.data'])
     model = pyTMD.model(model_dir,format='netcdf',compressed=False).elevation('FES2014')
     constituents = model.constituents
@@ -325,7 +321,6 @@ def compute_tides(lon,lat,utc_time,model_dir):
         real & imag of zmin are combined with f*cos(th) and f*sin(th) to from minor
     '''
 
-
     for i in range(len(lon)):
         tmp_tide = np.dot(hc_real[i,:],pf_costh) - np.dot(hc_imag[i,:],pf_sinth)
         tmp_minor = compute_minor_tide(np.atleast_2d(hc[i,:]),f_costh,f_sinth,len(utc_time),constituent_reorder,minor_indices)
@@ -333,9 +328,6 @@ def compute_tides(lon,lat,utc_time,model_dir):
         tide_min[i] = np.min(tmp_tide)
         tide_max[i] = np.max(tmp_tide)
 
-    # TIDE = predict_tidal_ts(np.atleast_1d(tide_time),hc,constituents,DELTAT=DELTAT,CORRECTIONS=model.format)
-    # MINOR = infer_minor_corrections(np.atleast_1d(tide_time),hc,constituents,DELTAT=DELTAT,CORRECTIONS=model.format)
-    # TIDE.data[:] += MINOR.data[:]
     return tide_min,tide_max
 
 def main():
@@ -461,22 +453,6 @@ def main():
         lat_array = lat_array[landmask == 1]
     
     tide_min,tide_max = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
-
-    fes2014_grid = np.empty((len(lat),len(lon)))
-    fes2014_grid[:] = np.nan
-
-    # for i in range(len(lat)):
-    #     sys.stdout.write('\r')
-    #     n_progressbar = (i + 1) / len(lat)
-    #     sys.stdout.write("[%-20s] %d%%" % ('='*int(20*n_progressbar), 100*n_progressbar))
-    #     sys.stdout.flush()
-    #     for j in range(len(lon)):
-    #         if phase_mask[i,j] == 1:
-    #             continue
-    #         tides = compute_tides(lon[j],lat[i],date_range_datetime,model_dir)
-    #         if tides is None:
-    #             continue
-    #         fes2014_grid[i,j] = np.max(tides)
 
     np.savetxt(output_file,np.c_[lon_array,lat_array,tide_min,tide_max],fmt='%.4f,%.4f,%.4f,%.4f',delimiter=',',header=None)
 
