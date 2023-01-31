@@ -9,6 +9,7 @@ import sys
 import netCDF4 as nc
 import subprocess
 import ctypes as c
+import shapely
 
 import pyTMD.time
 import pyTMD.model
@@ -362,25 +363,98 @@ def main():
     m2_data = nc.Dataset(m2_file)
     lon = np.asarray(m2_data['lon'][:])
     lat = np.asarray(m2_data['lat'][:])
+    lon = np.append(lon,360.0)
     phase_mask = np.asarray(m2_data['phase'][:].mask).astype(int)
     lon_mesh,lat_mesh = np.meshgrid(lon,lat)
     lon_array = lon_mesh.flatten()
     lat_array = lat_mesh.flatten()
+    lon_array[lon_array>180] -= 360
     
     if buffer_flag == True:
         res = 'i'
         area_threshold = 1e8
         buffer_dist = 500e3
+        x_max_3857 = 20037508.342789244
+        antimeridian = shapely.geometry.LineString([[180.0,90.0],[180.0,-90.0]])
+        meridian = shapely.geometry.LineString([[0.0,90.0],[0.0,-90.0]])
         coast_dir = config.get('COAST','coast_dir')
-        coast_shp = f'{coast_dir}/{res}/GSHHS_{res}_L1.shp'
+        coast_shp = f'{coast_dir}{res}/GSHHS_{res}_L1.shp'
         landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
         gdf_coast = gpd.read_file(coast_shp)
+        gdf_coast_orig = gdf_coast.copy()
         gdf_coast = gdf_coast.to_crs('EPSG:3857')
-        gdf_coast = gdf_coast[gdf_coast.area > area_threshold]
+        idx_area_threshold = gdf_coast.area > area_threshold
+        gdf_coast = gdf_coast[idx_area_threshold]
         gdf_coast = gdf_coast.buffer(buffer_dist)
-        gdf_coast = gdf_coast.to_crs('EPSG:4326')
-        lon_coast,lat_coast = get_lonlat_gdf(gdf_coast)
-        landmask = landmask_pts(lon_array,lat_array,lon_coast,lat_coast,landmask_c_file,inside_flag=1)
+        gdf_coast = gpd.GeoDataFrame(geometry=[gdf_coast.unary_union],crs='EPSG:3857')
+        # gdf_coast = gdf_coast.to_crs('EPSG:4326')
+        tmp_gdf = gpd.GeoDataFrame()
+        for i in range(len(gdf_coast)):
+            tmp_gdf = gpd.GeoDataFrame(pd.concat([tmp_gdf,gpd.GeoDataFrame(geometry=[p for p in gdf_coast.geometry[i].geoms],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
+        gdf_coast = tmp_gdf.copy()
+        gdf_buffered_filtered = gpd.GeoDataFrame()
+        for i in range(len(gdf_coast)):
+            x_poly,y_poly = get_lonlat_polygon(gdf_coast.geometry[i])
+            if np.nanmax(np.abs(x_poly)) < x_max_3857:
+                geom = gdf_coast.geometry[i]
+                gdf_buffered_filtered = gpd.GeoDataFrame(pd.concat([gdf_buffered_filtered,gpd.GeoDataFrame(geometry=[geom],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
+            else:
+                x_inside = x_poly.copy()
+                y_inside = y_poly.copy()
+                x_inside[x_inside > x_max_3857] = x_max_3857
+                x_inside[x_inside < -x_max_3857] = -x_max_3857
+                idx_nan = np.atleast_1d(np.argwhere(np.isnan(x_inside)).squeeze())
+                if len(idx_nan) == 0:
+                    idx_nan = np.array([0,len(x_inside)])
+                else:
+                    idx_nan = np.append(0,idx_nan+1,len(x_inside))
+                holes_list = []
+                for j in range(len(idx_nan)-1):
+                    if j ==0:
+                        x_tmp_exterior = x_inside[idx_nan[j]:idx_nan[j+1]]
+                        y_tmp_exterior = y_inside[idx_nan[j]:idx_nan[j+1]]
+                        geom_inside_exterior = shapely.geometry.Polygon(np.stack((x_tmp_exterior[~np.isnan(x_tmp_exterior)],y_tmp_exterior[~np.isnan(y_tmp_exterior)]),axis=1))
+                        geom_inside_exterior = geom_inside_exterior.buffer(0)
+                    else:
+                        x_tmp_hole = x_inside[idx_nan[j]:idx_nan[j+1]]
+                        y_tmp_hole = y_inside[idx_nan[j]:idx_nan[j+1]]
+                        geom_inside_hole = shapely.geometry.Polygon(np.stack((x_tmp_hole[~np.isnan(x_tmp_hole)],y_tmp_hole[~np.isnan(y_tmp_hole)]),axis=1))
+                        geom_inside_hole = geom_inside_hole.buffer(0)
+                        holes_list.append(geom_inside_hole)
+                geom_inside = shapely.geometry.Polygon(geom_inside_exterior.exterior.coords, [inner.exterior.coords for inner in holes_list])
+                gdf_buffered_filtered = gpd.GeoDataFrame(pd.concat([gdf_buffered_filtered,gpd.GeoDataFrame(geometry=[geom_inside],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
+                idx_outside = np.argwhere(np.abs(x_poly) > x_max_3857).squeeze()
+                x_outside = x_poly[idx_outside]
+                y_outside = y_poly[idx_outside]
+                x_outside[x_outside > x_max_3857] = x_outside[x_outside > x_max_3857] - 2*x_max_3857
+                x_outside[x_outside < -x_max_3857] = x_outside[x_outside < -x_max_3857] + 2*x_max_3857
+                dist_outside = np.sqrt((x_outside[1:]-x_outside[:-1])**2 + (y_outside[1:]-y_outside[:-1])**2)
+                idx_buffer_dist = np.argwhere(np.abs(x_outside) == x_max_3857 - buffer_dist).squeeze()
+                idx_dist = np.atleast_1d(np.argwhere(dist_outside > 1e5).squeeze())
+                if len(idx_dist) == 0:
+                    idx_dist = np.array([0,len(x_outside)])
+                else:
+                    idx_dist = idx_dist[np.asarray([idx not in idx_buffer_dist for idx in idx_dist])]
+                    idx_dist = np.append(0,idx_dist+1,len(x_outside))
+                for j in range(len(idx_dist)-1):
+                    x_segment = x_outside[idx_dist[j]:idx_dist[j+1]]
+                    y_segment = y_outside[idx_dist[j]:idx_dist[j+1]]
+                    if x_segment[0] > 0:
+                        x_segment = np.concatenate(([x_max_3857],x_segment[~np.isnan(x_segment)],[x_max_3857],[x_max_3857]))
+                        y_segment = np.concatenate(([y_segment[0]],y_segment[~np.isnan(y_segment)],[y_segment[-1]],[y_segment[0]]))
+                    elif x_segment[0] < 0:
+                        x_segment = np.concatenate(([-x_max_3857],x_segment[~np.isnan(x_segment)],[-x_max_3857],[-x_max_3857]))
+                        y_segment = np.concatenate(([y_segment[0]],y_segment[~np.isnan(y_segment)],[y_segment[-1]],[y_segment[0]]))
+                    geom_segment = shapely.geometry.Polygon(np.stack((x_segment,y_segment),axis=1))
+                    gdf_buffered_filtered = gpd.GeoDataFrame(pd.concat([gdf_buffered_filtered,gpd.GeoDataFrame(geometry=[geom_segment],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
+        gdf_buffered_filtered = gpd.GeoDataFrame(geometry=[gdf_buffered_filtered.unary_union],crs='EPSG:3857')
+        tmp_gdf = gpd.GeoDataFrame()
+        for i in range(len(gdf_buffered_filtered)):
+            tmp_gdf = gpd.GeoDataFrame(pd.concat([tmp_gdf,gpd.GeoDataFrame(geometry=[p for p in gdf_buffered_filtered.geometry[i].geoms],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
+        gdf_buffered_filtered = tmp_gdf.copy()
+        gdf_buffered_filtered = gdf_buffered_filtered.to_crs('EPSG:4326')
+        lon_coast,lat_coast = get_lonlat_gdf(gdf_buffered_filtered)
+        landmask = landmask_pts(lon_array,lat_array,lon_coast,lat_coast,landmask_c_file,inside_flag=0)
         lon_array = lon_array[landmask == 1]
         lat_array = lat_array[landmask == 1]
     
