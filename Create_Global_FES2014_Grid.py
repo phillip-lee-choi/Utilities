@@ -355,7 +355,7 @@ def main():
     m2_data = nc.Dataset(m2_file)
     lon = np.asarray(m2_data['lon'][:])
     lat = np.asarray(m2_data['lat'][:])
-    lon = lon = np.concatenate(([-180.0],lon[2881:]-360,lon[:2881]))
+    lon = np.concatenate(([-180.0],lon[2881:]-360,lon[:2881]))
     phase_mask = np.asarray(m2_data['phase'][:].mask).astype(int)
     phase_mask = np.concatenate((np.atleast_2d(phase_mask[:,2880]).T,phase_mask[:,2881:],phase_mask[:,:2881]),axis=1)
     lon_mesh,lat_mesh = np.meshgrid(lon,lat)
