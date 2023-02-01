@@ -2,10 +2,8 @@ import numpy as np
 import datetime
 import argparse
 import configparser
-import matplotlib.pyplot as plt
 import pandas as pd
 import geopandas as gpd
-import sys
 import netCDF4 as nc
 import subprocess
 import ctypes as c
@@ -14,8 +12,6 @@ import shapely
 import pyTMD.time
 import pyTMD.model
 from pyTMD.calc_delta_time import calc_delta_time
-from pyTMD.infer_minor_corrections import infer_minor_corrections
-from pyTMD.predict_tidal_ts import predict_tidal_ts
 from pyTMD.read_FES_model import extract_FES_constants
 from pyTMD.load_nodal_corrections import load_nodal_corrections
 from pyTMD.calc_astrol_longitudes import calc_astrol_longitudes
@@ -287,8 +283,14 @@ def compute_tides(lon,lat,utc_time,model_dir):
             np.atleast_1d(lat), model.model_file, TYPE=model.type,
             VERSION=model.version, METHOD='spline', EXTRAPOLATE=False,
             SCALE=model.scale, GZIP=model.compressed)
-    if np.any(amp.mask) == True:
-        return None,None
+    idx_no_data = np.unique(np.where(amp.mask == True)[0])
+    amp = np.delete(amp,idx_no_data,axis=0)
+    ph = np.delete(ph,idx_no_data,axis=0)
+    lon = np.delete(lon,idx_no_data)
+    lat = np.delete(lat,idx_no_data)
+
+    # if np.any(amp.mask) == True:
+    #     return None,None
     YMD = np.asarray([t.date() for t in utc_time])
     seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
     tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(YMD,seconds)])
@@ -301,7 +303,7 @@ def compute_tides(lon,lat,utc_time,model_dir):
     pf_sinth = (pf*np.sin(th)).transpose()
     hc_real = hc.data.real
     hc_imag = hc.data.imag
-    amp_flag = ~np.any(amp.mask,axis=1)
+    # amp_flag = ~np.any(amp.mask,axis=1)
     tide_min = np.zeros(len(lon))
     tide_max = np.zeros(len(lon))
     th_minor,f_minor = prep_minor_tide_inference(tide_time,DELTAT)
@@ -328,7 +330,7 @@ def compute_tides(lon,lat,utc_time,model_dir):
         tide_min[i] = np.min(tmp_tide)
         tide_max[i] = np.max(tmp_tide)
 
-    return tide_min,tide_max
+    return lon,lat,tide_min,tide_max
 
 def main():
     config_file = 'utils_config.ini'
@@ -452,9 +454,9 @@ def main():
         lon_array = lon_array[landmask == 1]
         lat_array = lat_array[landmask == 1]
     
-    tide_min,tide_max = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
+    lon_tide,lat_tide,tide_min,tide_max = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
 
-    np.savetxt(output_file,np.c_[lon_array,lat_array,tide_min,tide_max],fmt='%.4f,%.4f,%.4f,%.4f',delimiter=',',header=None)
+    np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max],fmt='%.4f,%.4f,%.4f,%.4f',delimiter=',',header=None)
 
 if __name__ == '__main__':
     main()
