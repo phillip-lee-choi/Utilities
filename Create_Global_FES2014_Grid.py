@@ -288,7 +288,7 @@ def compute_tides(lon,lat,utc_time,model_dir):
             VERSION=model.version, METHOD='spline', EXTRAPOLATE=False,
             SCALE=model.scale, GZIP=model.compressed)
     if np.any(amp.mask) == True:
-        return None
+        return None,None
     YMD = np.asarray([t.date() for t in utc_time])
     seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
     tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(YMD,seconds)])
