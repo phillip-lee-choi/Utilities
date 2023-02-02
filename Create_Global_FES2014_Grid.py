@@ -381,6 +381,7 @@ def main():
     lat_array = lat_array[phase_mask==0]
     
     if buffer_flag == True:
+        print('Buffering coast...')
         res = 'h'
         area_threshold = 5e6
         buffer_dist = 500e3
@@ -462,14 +463,16 @@ def main():
             tmp_gdf = gpd.GeoDataFrame(pd.concat([tmp_gdf,gpd.GeoDataFrame(geometry=[p for p in gdf_buffered_filtered.geometry[i].geoms],crs='EPSG:3857')],ignore_index=True),crs='EPSG:3857')
         gdf_buffered_filtered = tmp_gdf.copy()
         gdf_buffered_filtered = gdf_buffered_filtered.to_crs('EPSG:4326')
+        print('Buffer complete. Running mask...')
         lon_coast,lat_coast = get_lonlat_gdf(gdf_buffered_filtered)
         landmask = landmask_pts(lon_array,lat_array,lon_coast,lat_coast,landmask_c_file,inside_flag=1)
         lon_array = lon_array[landmask == 1]
         lat_array = lat_array[landmask == 1]
-    
+        print('Mask complete.')
+    print('Running tides...')
     lon_tide,lat_tide,tide_min,tide_max = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
-
     np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max],fmt='%.4f,%.4f,%.4f,%.4f',delimiter=',',header=None)
+    print('Tides complete.')
 
 if __name__ == '__main__':
     main()
