@@ -95,11 +95,11 @@ def compute_zmin_fes(z,n):
     '''
     z is not the same as zmajor!
     '''
-    mu2 = [0.069439968323, 0.351535557706, -0.046278307672]
-    nu2 = [-0.006104695053, 0.156878802427, 0.006755704028]
-    l2 = [0.077137765667, -0.051653455134, 0.027869916824]
-    t2 = [0.180480173707, -0.020101177502, 0.008331518844]
-    lda2 = [0.016503557465, -0.013307812292, 0.007753383202]
+    # mu2 = [0.069439968323, 0.351535557706, -0.046278307672]
+    # nu2 = [-0.006104695053, 0.156878802427, 0.006755704028]
+    # l2 = [0.077137765667, -0.051653455134, 0.027869916824]
+    # t2 = [0.180480173707, -0.020101177502, 0.008331518844]
+    # lda2 = [0.016503557465, -0.013307812292, 0.007753383202]
     zmin = np.zeros((n,20),dtype=np.complex64)
     zmin[:,0] = 0.263*z[:,0] - 0.0252*z[:,1]#-- 2Q1
     zmin[:,1] = 0.297*z[:,0] - 0.0264*z[:,1]#-- sigma1
@@ -110,21 +110,21 @@ def compute_zmin_fes(z,n):
     zmin[:,6] = 0.0030*z[:,1] + 0.0171*z[:,3]#-- pi1
     zmin[:,7] = -0.0015*z[:,1] + 0.0152*z[:,3]#-- phi1
     zmin[:,8] = -0.0065*z[:,1] + 0.0155*z[:,3]#-- theta1
-    zmin[:,9] = -0.0389*z[:,1] + 0.0836*z[:,3]#-- J1
+    # zmin[:,9] = -0.0389*z[:,1] + 0.0836*z[:,3]#-- J1
     zmin[:,10] = -0.0431*z[:,1] + 0.0613*z[:,3]#-- OO1
-    zmin[:,11] = 0.264*z[:,4] - 0.0253*z[:,5]#-- 2N2
-    zmin[:,12] = 0.298*z[:,4] - 0.0264*z[:,5]#-- mu2
-    zmin[:,13] = 0.165*z[:,4] + 0.00487*z[:,5]#-- nu2
-    zmin[:,14] = 0.0040*z[:,5] + 0.0074*z[:,6]#-- lambda2
-    zmin[:,15] = 0.0131*z[:,5] + 0.0326*z[:,6]#-- L2
-    zmin[:,16] = 0.0033*z[:,5] + 0.0082*z[:,6]#-- L2
-    zmin[:,17] = 0.0585*z[:,6]#-- t2
-    zmin[:,12] = mu2[0]*z[:,7] + mu2[1]*z[:,4] + mu2[2]*z[:,5]#-- mu2
-    zmin[:,13] = nu2[0]*z[:,7] + nu2[1]*z[:,4] + nu2[2]*z[:,5]#-- nu2
-    zmin[:,14] = lda2[0]*z[:,7] + lda2[1]*z[:,4] + lda2[2]*z[:,5]#-- lambda2
-    zmin[:,16] = l2[0]*z[:,7] + l2[1]*z[:,4] + l2[2]*z[:,5]#-- L2
-    zmin[:,17] = t2[0]*z[:,7] + t2[1]*z[:,4] + t2[2]*z[:,5]#-- t2
-    zmin[:,18] = 0.53285*z[:,8] - 0.03304*z[:,4]#-- eps2
+    # zmin[:,11] = 0.264*z[:,4] - 0.0253*z[:,5]#-- 2N2
+    # zmin[:,12] = 0.298*z[:,4] - 0.0264*z[:,5]#-- mu2
+    # zmin[:,13] = 0.165*z[:,4] + 0.00487*z[:,5]#-- nu2
+    # zmin[:,14] = 0.0040*z[:,5] + 0.0074*z[:,6]#-- lambda2
+    # zmin[:,15] = 0.0131*z[:,5] + 0.0326*z[:,6]#-- L2
+    # zmin[:,16] = 0.0033*z[:,5] + 0.0082*z[:,6]#-- L2
+    # zmin[:,17] = 0.0585*z[:,6]#-- t2
+    # zmin[:,12] = mu2[0]*z[:,7] + mu2[1]*z[:,4] + mu2[2]*z[:,5]#-- mu2
+    # zmin[:,13] = nu2[0]*z[:,7] + nu2[1]*z[:,4] + nu2[2]*z[:,5]#-- nu2
+    # zmin[:,14] = lda2[0]*z[:,7] + lda2[1]*z[:,4] + lda2[2]*z[:,5]#-- lambda2
+    # zmin[:,16] = l2[0]*z[:,7] + l2[1]*z[:,4] + l2[2]*z[:,5]#-- L2
+    # zmin[:,17] = t2[0]*z[:,7] + t2[1]*z[:,4] + t2[2]*z[:,5]#-- t2
+    # zmin[:,18] = 0.53285*z[:,8] - 0.03304*z[:,4]#-- eps2
     zmin[:,19] = -0.0034925*z[:,5] + 0.0831707*z[:,7]#-- eta2
     return zmin
 
@@ -263,14 +263,6 @@ def prep_minor_tide_inference(t,DELTAT):
     th = (arg + u)*dtr
     return th,f
 
-def compute_minor_tide(zmajor,f_costh,f_sinth,n,constituent_reorder,minor_indices):
-    z = zmajor[:,constituent_reorder]
-    zmin = compute_zmin_fes(z,n)
-    zmin = zmin[:,minor_indices]
-    minor_tide = np.sum(zmin.real*f_costh - zmin.imag*f_sinth,axis=1)
-    return minor_tide
-
-
 def compute_tides(lon,lat,utc_time,model_dir):
     '''
     Assumes utc_time is in datetime format
@@ -289,8 +281,6 @@ def compute_tides(lon,lat,utc_time,model_dir):
     lon = np.delete(lon,idx_no_data)
     lat = np.delete(lat,idx_no_data)
 
-    # if np.any(amp.mask) == True:
-    #     return None,None
     YMD = np.asarray([t.date() for t in utc_time])
     seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
     tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(YMD,seconds)])
@@ -303,10 +293,32 @@ def compute_tides(lon,lat,utc_time,model_dir):
     pf_sinth = (pf*np.sin(th)).transpose()
     hc_real = hc.data.real
     hc_imag = hc.data.imag
-    # amp_flag = ~np.any(amp.mask,axis=1)
     tide_min = np.zeros(len(lon))
     tide_max = np.zeros(len(lon))
     th_minor,f_minor = prep_minor_tide_inference(tide_time,DELTAT)
+
+    Z_matrix = np.array([
+        [0.263,-0.0252,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.297,-0.0264,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.164,0.0048,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0140,0.0,0.0101,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0389,0.0,0.0282,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0064,0.0,0.0060,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0030,0.0,0.0171,0.0,0.0,0.0,0.0,0.0],
+        [0.0,-0.0015,0.0,0.0152,0.0,0.0,0.0,0.0,0.0],
+        [0.0,-0.0065,0.0,0.0155,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,-0.0431,0.0,0.0613,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+        [0.0,0.0,0.0,0.0,0.0,-0.0034925,0.0,0.0831707,0.0],
+    ])
     
     f_costh = f_minor * np.cos(th_minor)
     f_sinth = f_minor * np.sin(th_minor)
@@ -315,17 +327,18 @@ def compute_tides(lon,lat,utc_time,model_dir):
     minor_indices = [i for i,m in enumerate(minor) if m not in constituents]
     f_costh = f_costh[:,minor_indices]
     f_sinth = f_sinth[:,minor_indices]
+    f_costh = f_costh.transpose()
+    f_sinth = f_sinth.transpose()
     constituent_reorder = np.asarray([26,24,25,3,21,7,29,4,0])
-    '''
-    Need to only iterate over minor tidal constituents
-    Need to reshape a single hc to zmajor, then to z, then to zmin
-        probably needs to be done in the for loop
-        real & imag of zmin are combined with f*cos(th) and f*sin(th) to from minor
-    '''
+    z = hc[:,constituent_reorder]
+    zmin = np.matmul(z.data,Z_matrix.transpose())
+    zmin = zmin[:,minor_indices]
+    zmin_real = zmin.real
+    zmin_imag = zmin.imag
 
     for i in range(len(lon)):
         tmp_tide = np.dot(hc_real[i,:],pf_costh) - np.dot(hc_imag[i,:],pf_sinth)
-        tmp_minor = compute_minor_tide(np.atleast_2d(hc[i,:]),f_costh,f_sinth,len(utc_time),constituent_reorder,minor_indices)
+        tmp_minor = np.dot(zmin_real[i,:],f_costh) - np.dot(zmin_imag[i,:],f_sinth)
         tmp_tide += tmp_minor
         tide_min[i] = np.min(tmp_tide)
         tide_max[i] = np.max(tmp_tide)
