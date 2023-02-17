@@ -107,6 +107,7 @@ def main():
 
     continents_list = ['Africa','Asia','Europe','Middle_East','Oceania','South_America','North_America']
     for continent in continents_list:
+        print(f'{continent}')
         continent_dir = f'{NASA_SEALEVEL_dir}{continent}/'
         output_file = f'{NASA_SEALEVEL_dir}{continent}_DSM_extents.txt'
         f = open(output_file,'w')
@@ -124,8 +125,11 @@ def main():
                 lon_max_strips = np.max((lon_max_strips,lon_max_single_strip))
                 lat_min_strips = np.min((lat_min_strips,lat_min_single_strip))
                 lat_max_strips = np.max((lat_max_strips,lat_max_single_strip))
-            f.write(f'{loc_name},{lon_min_strips:.2f},{lon_max_strips:.2f},{lat_min_strips:.2f},{lat_max_strips:.2f}')
+            if lon_min_strips == 180 or lon_max_strips == -180 or lat_min_strips == 90 or lat_max_strips == -90:
+                continue
+            f.write(f'{loc_name},{lon_min_strips:.2f},{lon_max_strips:.2f},{lat_min_strips:.2f},{lat_max_strips:.2f}\n')
         f.close()
+        print(' ')
 
 if __name__ == '__main__':
     main()
