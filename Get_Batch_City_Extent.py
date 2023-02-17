@@ -126,3 +126,6 @@ def main():
                 lat_max_strips = np.max((lat_max_strips,lat_max_single_strip))
             f.write(f'{loc_name},{lon_min_strips:.2f},{lon_max_strips:.2f},{lat_min_strips:.2f},{lat_max_strips:.2f}')
         f.close()
+
+if __name__ == '__main__':
+    main()
