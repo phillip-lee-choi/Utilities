@@ -408,7 +408,7 @@ def main():
     src_andwi = gdal.Open(andwi_threshold_local_file)
     andwi_data = np.asarray(src_andwi.GetRasterBand(1).ReadAsArray())
     andwi_data_connected = connected_components(andwi_data)
-    write_code = write_new_array_geotiff(src_andwi,andwi_data_connected,andwi_coastline,gdalconst.GDT_UInt8)
+    write_code = write_new_array_geotiff(src_andwi,andwi_data_connected,andwi_coastline,gdalconst.GDT_Byte)
     andwi_coastline_shp_file = polygonize_tif(andwi_coastline)
     '''
     Add code to simplify to ~10 m or 20 m
