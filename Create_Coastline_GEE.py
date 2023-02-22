@@ -228,7 +228,7 @@ def download_google_drive_id(gdrive_service,file_id):
         return 0
     return file.getvalue()
 
-def download_img_google_drive(filename,output_folder,tmp_dir,token_json,credentials_json,SCOPES):
+def download_img_google_drive(filename,output_folder,output_dir,token_json,credentials_json,SCOPES):
     creds = get_google_drive_credentials(token_json,credentials_json,[SCOPES])
     service = googleapiclient.discovery.build('drive', 'v3', credentials=creds)
     folder_list = get_google_drive_dir_id(service,output_folder)
@@ -247,7 +247,7 @@ def download_img_google_drive(filename,output_folder,tmp_dir,token_json,credenti
         if download_code == 0:
             continue
         else:
-            f = open(f'{tmp_dir}{filename}','wb')
+            f = open(f'{output_dir}{filename}','wb')
             f.write(download_code)
             f.close()
             return 0
@@ -399,7 +399,7 @@ def main():
     dt = t_end - t_start
     print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
     t_start = datetime.datetime.now()
-    download_code = download_img_google_drive(andwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
+    download_code = download_img_google_drive(andwi_threshold_filename,output_folder_gdrive,input_location,token_json,credentials_json,SCOPES)
     if download_code is None:
         print('Could not download image from Google Drive.')
         sys.exit()
@@ -410,6 +410,9 @@ def main():
     andwi_data_connected = connected_components(andwi_data)
     write_code = write_new_array_geotiff(src_andwi,andwi_data_connected,andwi_coastline,gdalconst.GDT_UInt8)
     andwi_coastline_shp_file = polygonize_tif(andwi_coastline)
+    '''
+    Add code to simplify to ~10 m or 20 m
+    '''
     t_end = datetime.datetime.now()
     dt = t_end - t_start
     print(f'Processing image took {dt.seconds + dt.microseconds/1e6:.1f} s.')
