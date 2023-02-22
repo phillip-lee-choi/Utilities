@@ -324,9 +324,7 @@ def main():
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
     s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
     #select (in order): Blue, Green, Red, NIR, Cloud Probability Map, Cloud mask
-    # s2 = s2.select('B2','B3','B4','B8','B11','MSK_CLDPRB','QA60')
     print('Loaded Sentinel 2.')
-    # print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     warnings.simplefilter(action='ignore')
     config_file = 'utils_config.ini'
     config = configparser.ConfigParser()
@@ -346,21 +344,14 @@ def main():
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
 
     if loc_name is None:
-        loc_name = input_location.split('/')[-1]
+        loc_name = input_location.split('/')[-2]
     if input_location is None:
         input_location = tmp_dir
 
     output_folder_gdrive = f'GEE_{loc_name}'
     
     SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
-    NASA_SEALEVEL_dir = config.get('GENERAL_PATHS','NASA_SEALEVEL_dir')
     CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
-    CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
-    NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
-    CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
-    BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
-    OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
-    SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
     NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
     token_json = config.get('GDRIVE_PATHS','token_json')
     credentials_json = config.get('GDRIVE_PATHS','credentials_json')
@@ -371,7 +362,7 @@ def main():
 
     if lonlat_extents is None:
         strip_list = get_strip_list(input_location,input_type,corrected_flag,dir_structure)
-        if len(strip_list == 0):
+        if len(strip_list) == 0:
             print('No strips found.')
             sys.exit()
         lon_min_strips,lon_max_strips,lat_min_strips,lat_max_strips = 180,-180,90,-90
