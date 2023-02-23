@@ -436,28 +436,38 @@ def main():
         print('Could not download image from Google Drive.')
         sys.exit()
     andwi_threshold_local_file = f'{input_location}{andwi_threshold_filename}'
-    andwi_coastline = f'{input_location}{loc_name}_S2_ANDWI_Coastline.tif'
+    andwi_coastline_tif_file = f'{input_location}{loc_name}_S2_ANDWI_Coastline.tif'
+    andwi_surface_water_tif_file = f'{input_location}{loc_name}_S2_ANDWI_Surface_Water.tif'
     src_andwi = gdal.Open(andwi_threshold_local_file)
     andwi_data = np.asarray(src_andwi.GetRasterBand(1).ReadAsArray())
-    andwi_data_connected = connected_components(andwi_data)
-    andwi_data_connected = andwi_data_connected*-1 + 1
-    write_code = write_new_array_geotiff(src_andwi,andwi_data_connected,andwi_coastline,gdalconst.GDT_Byte)
-    andwi_coastline_shp_file = polygonize_tif(andwi_coastline)
+    surface_water_data = connected_components(andwi_data)
+    coastline_data = surface_water_data*-1 + 1
+    write_code = write_new_array_geotiff(src_andwi,coastline_data,andwi_coastline_tif_file,gdalconst.GDT_Byte)
+    andwi_coastline_shp_file = polygonize_tif(andwi_coastline_tif_file)
+    write_code = write_new_array_geotiff(src_andwi,surface_water_data,andwi_surface_water_tif_file,gdalconst.GDT_Byte)
+    andwi_surface_water_shp_file = polygonize_tif(andwi_surface_water_tif_file)
     '''
     Add code to simplify to ~10 m or 20 m
     '''
     if simplify_radius is not None:
-        simplified_shp_file = f'{input_location}{loc_name}_S2_ANDWI_Coastline_Simplified.shp'
+        simplified_coastline_shp_file = f'{input_location}{loc_name}_S2_ANDWI_Coastline_Simplified.shp'
+        simplified_surface_water_shp_file = f'{input_location}{loc_name}_S2_ANDWI_Surface_Water_Simplified.shp'
         gdf_coastline = gpd.read_file(andwi_coastline_shp_file)
+        gdf_surface_water = gpd.read_file(andwi_surface_water_shp_file)
         lon_min,lon_max,lat_min,lat_max = get_lonlat_bounds_gdf(gdf_coastline)
         lon_center = np.mean((lon_min,lon_max))
         lat_center = np.mean((lat_min,lat_max))
         epsg_code = lonlat2epsg(lon_center,lat_center)
         gdf_coastline = gdf_coastline.to_crs(f'EPSG:{epsg_code}')
-        gdf_simplified = gdf_coastline.copy()
-        gdf_simplified['geometry'] = gdf_simplified.apply(lambda x : simplify_polygon(x.geometry,simplify_radius),axis=1)
-        gdf_simplified = gdf_simplified.to_crs('EPSG:4326')
-        gdf_simplified.to_file(simplified_shp_file)
+        gdf_coastline_simplified = gdf_coastline.copy()
+        gdf_coastline_simplified['geometry'] = gdf_coastline_simplified.apply(lambda x : simplify_polygon(x.geometry,simplify_radius),axis=1)
+        gdf_coastline_simplified = gdf_coastline_simplified.to_crs('EPSG:4326')
+        gdf_coastline_simplified.to_file(simplified_coastline_shp_file)
+        gdf_surface_water = gdf_surface_water.to_crs(f'EPSG:{epsg_code}')
+        gdf_surface_water_simplified = gdf_surface_water.copy()
+        gdf_surface_water_simplified['geometry'] = gdf_surface_water_simplified.apply(lambda x : simplify_polygon(x.geometry,simplify_radius),axis=1)
+        gdf_surface_water_simplified = gdf_surface_water_simplified.to_crs('EPSG:4326')
+        gdf_surface_water_simplified.to_file(simplified_surface_water_shp_file)
 
 
 
