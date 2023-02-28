@@ -480,8 +480,8 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
 
 def main():
     ee.Initialize()
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
+    # s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    # s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
     #select (in order): Blue, Green, Red, NIR, Cloud Probability Map, Cloud mask
     # s2 = s2.select('B2','B3','B4','B8','B11','MSK_CLDPRB','QA60')
     print('Loaded Sentinel 2.')
@@ -499,34 +499,34 @@ def main():
     N_cpus = int(args.cpus)
 
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
-    landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
+    # landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
     
-    SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
+    # SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
 
-    DT_SEARCH = config.getint('GEE_CONSTANTS','DT_SEARCH')
-    CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
-    CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
-    NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
-    CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
-    BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
-    OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
-    SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
-    NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
-    NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
+    # DT_SEARCH = config.getint('GEE_CONSTANTS','DT_SEARCH')
+    # CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
+    # CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
+    # NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
+    # CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
+    # BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
+    # OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
+    # SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
+    # NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
+    # NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
 
-    token_json = config.get('GDRIVE_PATHS','token_json')
-    credentials_json = config.get('GDRIVE_PATHS','credentials_json')
+    # token_json = config.get('GDRIVE_PATHS','token_json')
+    # credentials_json = config.get('GDRIVE_PATHS','credentials_json')
 
     df = pd.read_csv(input_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
     df['day'] = [t[:10] for t in df.time]
-    lon_i2 = np.asarray(df.lon)
-    lat_i2 = np.asarray(df.lat)
-    height_i2 = np.asarray(df.height)
-    time_i2 = np.asarray(df.time)
+    # lon_i2 = np.asarray(df.lon)
+    # lat_i2 = np.asarray(df.lat)
+    # height_i2 = np.asarray(df.height)
+    # time_i2 = np.asarray(df.time)
     gdf_conv_hull = csv_to_convex_hull_shp(df,input_file)
 
     loc_name = input_file.split('/')[-1].split('_ATL03')[0]
-    output_folder_gdrive = f'GEE_{loc_name}'
+    # output_folder_gdrive = f'GEE_{loc_name}'
     gdf_conv_hull['loc_name'] = loc_name
 
     for day in gdf_conv_hull.day:
