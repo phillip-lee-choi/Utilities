@@ -538,13 +538,13 @@ def main():
     loc_name_array = np.asarray(gdf_conv_hull.loc_name)
     subset_file_array = np.asarray(sorted(glob.glob(f'{tmp_dir}{loc_name}*_ATL03.txt')))
 
+    t_start_full = datetime.datetime.now()
 
     p = multiprocessing.Pool(N_cpus)
 
     p.starmap(parallel_s2_image,zip(index_array,day_array,geometry_array,loc_name_array,subset_file_array))
 
 
-    t_start_full = datetime.datetime.now()
     # for i in range(len(gdf_conv_hull)):
     #     print(f'{i+1}/{len(gdf_conv_hull)}')
     #     t_start = datetime.datetime.now()
