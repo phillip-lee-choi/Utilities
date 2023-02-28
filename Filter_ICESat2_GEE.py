@@ -220,7 +220,7 @@ def csv_to_convex_hull_shp(df,csv_file,writing=True):
         gdf.to_file(output_file)
     return gdf
 
-def find_s2_image(geometry,day,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
+def find_s2_image(day,geometry,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
     csv_day_ee = ee.Date.parse('YYYY-MM-dd',day)
     csv_geometry = geometry
     csv_geometry_bounds = csv_geometry.bounds
