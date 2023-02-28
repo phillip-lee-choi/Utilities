@@ -411,9 +411,7 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
     config_file = 'utils_config.ini'
     config = configparser.ConfigParser()
     config.read(config_file)
-
     output_folder_gdrive = f'GEE_{loc_name}'
-
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
     landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
 
@@ -427,7 +425,6 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
     SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
     NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
     NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
-
     SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
     token_json = config.get('GDRIVE_PATHS','token_json')
     credentials_json = config.get('GDRIVE_PATHS','credentials_json')
@@ -452,6 +449,7 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
     if download_code is None:
         print(f'Could not download image {idx} from Google Drive.')
         return 0
+    
     ndvi_ndwi_threshold_local_file = f'{tmp_dir}{ndvi_ndwi_threshold_filename}'
     ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
     gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
