@@ -268,7 +268,6 @@ def find_s2_image(day,geometry,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BU
     s2_select_clouds_removed_mosaic = s2_select_clouds_removed.mosaic()
     return s2_select_clouds_removed_mosaic,ymd_select_info,polygon
 
-
 def export_to_drive(img,filename,geometry,loc_name):
     basename = os.path.splitext(filename)[0]
     export_task = ee.batch.Export.image.toDrive(image=img,
@@ -476,16 +475,8 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
     print(f'Applying filter for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
     return 1
 
-
-
 def main():
     ee.Initialize()
-    # s2 = ee.ImageCollection('COPERNICUS/S2_SR')
-    # s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
-    #select (in order): Blue, Green, Red, NIR, Cloud Probability Map, Cloud mask
-    # s2 = s2.select('B2','B3','B4','B8','B11','MSK_CLDPRB','QA60')
-    print('Loaded Sentinel 2.')
-    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     warnings.simplefilter(action='ignore')
     config_file = 'utils_config.ini'
     config = configparser.ConfigParser()
@@ -499,34 +490,12 @@ def main():
     N_cpus = int(args.cpus)
 
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
-    # landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
-    
-    # SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
-
-    # DT_SEARCH = config.getint('GEE_CONSTANTS','DT_SEARCH')
-    # CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
-    # CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
-    # NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
-    # CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
-    # BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
-    # OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
-    # SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
-    # NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
-    # NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
-
-    # token_json = config.get('GDRIVE_PATHS','token_json')
-    # credentials_json = config.get('GDRIVE_PATHS','credentials_json')
 
     df = pd.read_csv(input_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
     df['day'] = [t[:10] for t in df.time]
-    # lon_i2 = np.asarray(df.lon)
-    # lat_i2 = np.asarray(df.lat)
-    # height_i2 = np.asarray(df.height)
-    # time_i2 = np.asarray(df.time)
     gdf_conv_hull = csv_to_convex_hull_shp(df,input_file)
 
     loc_name = input_file.split('/')[-1].split('_ATL03')[0]
-    # output_folder_gdrive = f'GEE_{loc_name}'
     gdf_conv_hull['loc_name'] = loc_name
 
     for day in gdf_conv_hull.day:
@@ -541,70 +510,18 @@ def main():
     t_start_full = datetime.datetime.now()
 
     p = multiprocessing.Pool(N_cpus)
-
     p.starmap(parallel_s2_image,zip(index_array,day_array,geometry_array,loc_name_array,subset_file_array))
+    p.close()
 
-
-    # for i in range(len(gdf_conv_hull)):
-    #     print(f'{i+1}/{len(gdf_conv_hull)}')
-    #     t_start = datetime.datetime.now()
-    #     i2_ymd = gdf_conv_hull.day[i].replace('-','')
-    #     s2_image,s2_ymd,s2_geometry = find_s2_image(gdf_conv_hull.iloc[[i]].reset_index(drop=True),s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)
-    #     if s2_image is None:
-    #         print('No suitable Sentinel-2 data.')
-    #         continue
-    #     ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
-    #     ndvi_ndwi_threshold_filename = f'{loc_name}_ATL03_{i2_ymd}_S2_{s2_ymd}_NDVI_NDWI_threshold.tif'
-    #     export_code = export_to_drive(ndvi_ndwi_threshold,ndvi_ndwi_threshold_filename,s2_geometry,loc_name)
-    #     if export_code is None:
-    #         print('Google Drive export failed.')
-    #         continue
-    #     t_end = datetime.datetime.now()
-    #     dt = t_end - t_start
-    #     print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
-
-        # '''
-        # Access that particular file from Google Drive
-        #     Do credentials at very beginning of script
-        # Download it
-        # gdal_translate it with -a_nodata 0
-        # gdal_polygonize it 
-        # load up shapefile as numpy array
-        # landmask the particular segment of the ICESat-2 csv with that lon/lat array
-        # write out filtered csv
-        # Concatenate all filtered csvs into one csv
-        # '''
-        # t_start = datetime.datetime.now()
-        # download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
-        # if download_code is None:
-        #     print('Could not download image from Google Drive.')
-        #     continue
-        # ndvi_ndwi_threshold_local_file = f'{tmp_dir}{ndvi_ndwi_threshold_filename}'
-        # ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
-        # gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
-        # lon_ndvi_ndwi,lat_ndvi_ndwi = get_lonlat_gdf(gdf_ndvi_ndwi_threshold)
-        # idx_subset_day = get_idx_subset_day(time_i2,gdf_conv_hull.day[i])
-        # lon_subset_day = lon_i2[idx_subset_day]
-        # lat_subset_day = lat_i2[idx_subset_day]
-        # height_subset_day = height_i2[idx_subset_day]
-        # time_subset_day = time_i2[idx_subset_day]
-
-        # landmask = landmask_csv(lon_subset_day,lat_subset_day,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
-        # lon_masked = lon_subset_day[landmask]
-        # lat_masked = lat_subset_day[landmask]
-        # height_masked = height_subset_day[landmask]
-        # time_masked = time_subset_day[landmask]
-
-        # output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
-        # np.savetxt(output_file,np.c_[lon_masked,lat_masked,height_masked,time_masked.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
-        # t_end = datetime.datetime.now()
-        # dt = t_end - t_start
-        # print(f'Applying filter took {dt.seconds + dt.microseconds/1e6:.1f} s.')
-    
     file_list = sorted(glob.glob(f'{tmp_dir}{loc_name}_*_Filtered_NDVI_NDWI.txt'))
     output_full_file = input_file.replace('.txt','_Filtered_NDVI_NDWI.txt')
     cat_command = f'cat {" ".join(file_list)} > {output_full_file}'
     subprocess.run(cat_command,shell=True)
+    ndvi_ndwi_dir = f'{os.path.dirname(input_file)}/NDVI_NDWI/'
+    if not os.path.isdir(ndvi_ndwi_dir):
+        os.mkdir(ndvi_ndwi_dir)
+    mv_command = f'mv {tmp_dir}{loc_name}* {ndvi_ndwi_dir}'
+    subprocess.run(mv_command,shell=True)
     t_end_full = datetime.datetime.now()
     dt_full = t_end_full - t_start_full
     if dt_full.seconds > 3600:
