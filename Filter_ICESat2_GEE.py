@@ -13,6 +13,7 @@ import time
 import ctypes as c
 import glob
 import io
+import multiprocessing
 
 import google.auth.transport.requests #Request
 import google.oauth2.credentials #Credentials
@@ -219,15 +220,15 @@ def csv_to_convex_hull_shp(df,csv_file,writing=True):
         gdf.to_file(output_file)
     return gdf
 
-def find_s2_image(gdf,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
-    csv_day_ee = ee.Date.parse('YYYY-MM-dd',gdf.day[0])
-    csv_geometry = gdf.geometry[0]
+def find_s2_image(geometry,day,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
+    csv_day_ee = ee.Date.parse('YYYY-MM-dd',day)
+    csv_geometry = geometry
     csv_geometry_bounds = csv_geometry.bounds
     csv_geometry_xy = [[x,y] for x,y in zip(csv_geometry.exterior.xy[0],csv_geometry.exterior.xy[1])]
     polygon = ee.Geometry.Polygon(csv_geometry_xy)
-    i_date = datetime.datetime.strptime(gdf.day[0],'%Y-%m-%d') - datetime.timedelta(days=DT_SEARCH)
+    i_date = datetime.datetime.strptime(day,'%Y-%m-%d') - datetime.timedelta(days=DT_SEARCH)
     i_date = i_date.strftime('%Y-%m-%d')
-    f_date = datetime.datetime.strptime(gdf.day[0],'%Y-%m-%d') + datetime.timedelta(days=DT_SEARCH+1) #because f_date is exclusive
+    f_date = datetime.datetime.strptime(day,'%Y-%m-%d') + datetime.timedelta(days=DT_SEARCH+1) #because f_date is exclusive
     f_date = f_date.strftime('%Y-%m-%d')
     s2_date_region = s2.filterDate(i_date,f_date).filterBounds(polygon)
     s2_cloud_probability_date_region = s2_cloud_probability.filterDate(i_date,f_date).filterBounds(polygon)
@@ -363,9 +364,6 @@ def download_google_drive_id(gdrive_service,file_id):
         return 0
     return file.getvalue()
 
-    
-
-
 def download_img_google_drive(filename,output_folder,tmp_dir,token_json,credentials_json,SCOPES):
     creds = get_google_drive_credentials(token_json,credentials_json,[SCOPES])
     service = googleapiclient.discovery.build('drive', 'v3', credentials=creds)
@@ -405,6 +403,81 @@ def polygonize_tif(img):
     subprocess.run(polygonize_command,shell=True)
     return shp
 
+def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
+    t_start = datetime.datetime.now()
+    print(f'Working on {idx}...')
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
+
+    config_file = 'utils_config.ini'
+    config = configparser.ConfigParser()
+    config.read(config_file)
+
+    output_folder_gdrive = f'GEE_{loc_name}'
+
+    tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
+    landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
+
+    DT_SEARCH = config.getint('GEE_CONSTANTS','DT_SEARCH')
+    CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
+    CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
+    NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
+    CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
+    BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
+    OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
+    SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
+    NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
+    NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
+
+    SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
+    token_json = config.get('GDRIVE_PATHS','token_json')
+    credentials_json = config.get('GDRIVE_PATHS','credentials_json')
+
+    i2_ymd = day.replace('-','')
+    s2_image,s2_ymd,s2_geometry = find_s2_image(day,geometry,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)
+    if s2_image is None:
+        print(f'No suitable Sentinel-2 data for {idx}.')
+        return 0
+    ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
+    ndvi_ndwi_threshold_filename = f'{loc_name}_ATL03_{i2_ymd}_S2_{s2_ymd}_NDVI_NDWI_threshold.tif'
+    export_code = export_to_drive(ndvi_ndwi_threshold,ndvi_ndwi_threshold_filename,s2_geometry,loc_name)
+    if export_code is None:
+        print(f'Google Drive export failed for {idx}.')
+        return 0
+    t_end = datetime.datetime.now()
+    dt = t_end - t_start
+    print(f'Processing Sentinel-2 for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
+
+    t_start = datetime.datetime.now()
+    download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
+    if download_code is None:
+        print(f'Could not download image {idx} from Google Drive.')
+        return 0
+    ndvi_ndwi_threshold_local_file = f'{tmp_dir}{ndvi_ndwi_threshold_filename}'
+    ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
+    gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
+    lon_ndvi_ndwi,lat_ndvi_ndwi = get_lonlat_gdf(gdf_ndvi_ndwi_threshold)
+    df_subset_day = pd.read_csv(subset_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
+    lon_subset_day = np.asarray(df_subset_day.lon)
+    lat_subset_day = np.asarray(df_subset_day.lat)
+    height_subset_day = np.asarray(df_subset_day.height)
+    time_subset_day = np.asarray(df_subset_day.time)
+
+    landmask = landmask_csv(lon_subset_day,lat_subset_day,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
+    lon_masked = lon_subset_day[landmask]
+    lat_masked = lat_subset_day[landmask]
+    height_masked = height_subset_day[landmask]
+    time_masked = time_subset_day[landmask]
+
+    output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
+    np.savetxt(output_file,np.c_[lon_masked,lat_masked,height_masked,time_masked.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
+    t_end = datetime.datetime.now()
+    dt = t_end - t_start
+    print(f'Applying filter for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
+    return 1
+
+
+
 def main():
     ee.Initialize()
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
@@ -420,8 +493,10 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file',help='Path to csv to filter')
+    parser.add_argument('--cpus',help='Number of cpus to use',default=1)
     args = parser.parse_args()
     input_file = args.input_file
+    N_cpus = int(args.cpus)
 
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
     landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
@@ -443,6 +518,7 @@ def main():
     credentials_json = config.get('GDRIVE_PATHS','credentials_json')
 
     df = pd.read_csv(input_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
+    df['day'] = [t[:10] for t in df.time]
     lon_i2 = np.asarray(df.lon)
     lat_i2 = np.asarray(df.lat)
     height_i2 = np.asarray(df.height)
@@ -451,63 +527,79 @@ def main():
 
     loc_name = input_file.split('/')[-1].split('_ATL03')[0]
     output_folder_gdrive = f'GEE_{loc_name}'
+    gdf_conv_hull['loc_name'] = loc_name
+
+    for day in gdf_conv_hull.day:
+        df[df.day == day].to_csv(f'{tmp_dir}{loc_name}_{day.replace("-","")}_ATL03.txt',index=False,header=False,columns=['lon','lat','height','time'])
+
+    index_array = gdf_conv_hull.index.to_numpy(dtype=int)
+    day_array = np.asarray(gdf_conv_hull.day)
+    geometry_array = np.asarray(gdf_conv_hull.geometry)
+    loc_name_array = np.asarray(gdf_conv_hull.loc_name)
+    subset_file_array = np.asarray(sorted(glob.glob(f'{tmp_dir}{loc_name}*_ATL03.txt')))
+
+
+    p = multiprocessing.Pool(N_cpus)
+
+    p.starmap(parallel_s2_image,zip(index_array,day_array,geometry_array,loc_name_array,subset_file_array))
+
 
     t_start_full = datetime.datetime.now()
-    for i in range(len(gdf_conv_hull)):
-        print(f'{i+1}/{len(gdf_conv_hull)}')
-        t_start = datetime.datetime.now()
-        i2_ymd = gdf_conv_hull.day[i].replace('-','')
-        s2_image,s2_ymd,s2_geometry = find_s2_image(gdf_conv_hull.iloc[[i]].reset_index(drop=True),s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)
-        if s2_image is None:
-            print('No suitable Sentinel-2 data.')
-            continue
-        ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
-        ndvi_ndwi_threshold_filename = f'{loc_name}_ATL03_{i2_ymd}_S2_{s2_ymd}_NDVI_NDWI_threshold.tif'
-        export_code = export_to_drive(ndvi_ndwi_threshold,ndvi_ndwi_threshold_filename,s2_geometry,loc_name)
-        if export_code is None:
-            print('Google Drive export failed.')
-            continue
-        t_end = datetime.datetime.now()
-        dt = t_end - t_start
-        print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
+    # for i in range(len(gdf_conv_hull)):
+    #     print(f'{i+1}/{len(gdf_conv_hull)}')
+    #     t_start = datetime.datetime.now()
+    #     i2_ymd = gdf_conv_hull.day[i].replace('-','')
+    #     s2_image,s2_ymd,s2_geometry = find_s2_image(gdf_conv_hull.iloc[[i]].reset_index(drop=True),s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)
+    #     if s2_image is None:
+    #         print('No suitable Sentinel-2 data.')
+    #         continue
+    #     ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
+    #     ndvi_ndwi_threshold_filename = f'{loc_name}_ATL03_{i2_ymd}_S2_{s2_ymd}_NDVI_NDWI_threshold.tif'
+    #     export_code = export_to_drive(ndvi_ndwi_threshold,ndvi_ndwi_threshold_filename,s2_geometry,loc_name)
+    #     if export_code is None:
+    #         print('Google Drive export failed.')
+    #         continue
+    #     t_end = datetime.datetime.now()
+    #     dt = t_end - t_start
+    #     print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
 
-        '''
-        Access that particular file from Google Drive
-            Do credentials at very beginning of script
-        Download it
-        gdal_translate it with -a_nodata 0
-        gdal_polygonize it 
-        load up shapefile as numpy array
-        landmask the particular segment of the ICESat-2 csv with that lon/lat array
-        write out filtered csv
-        Concatenate all filtered csvs into one csv
-        '''
-        t_start = datetime.datetime.now()
-        download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
-        if download_code is None:
-            print('Could not download image from Google Drive.')
-            continue
-        ndvi_ndwi_threshold_local_file = f'{tmp_dir}{ndvi_ndwi_threshold_filename}'
-        ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
-        gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
-        lon_ndvi_ndwi,lat_ndvi_ndwi = get_lonlat_gdf(gdf_ndvi_ndwi_threshold)
-        idx_subset_day = get_idx_subset_day(time_i2,gdf_conv_hull.day[i])
-        lon_subset_day = lon_i2[idx_subset_day]
-        lat_subset_day = lat_i2[idx_subset_day]
-        height_subset_day = height_i2[idx_subset_day]
-        time_subset_day = time_i2[idx_subset_day]
+        # '''
+        # Access that particular file from Google Drive
+        #     Do credentials at very beginning of script
+        # Download it
+        # gdal_translate it with -a_nodata 0
+        # gdal_polygonize it 
+        # load up shapefile as numpy array
+        # landmask the particular segment of the ICESat-2 csv with that lon/lat array
+        # write out filtered csv
+        # Concatenate all filtered csvs into one csv
+        # '''
+        # t_start = datetime.datetime.now()
+        # download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
+        # if download_code is None:
+        #     print('Could not download image from Google Drive.')
+        #     continue
+        # ndvi_ndwi_threshold_local_file = f'{tmp_dir}{ndvi_ndwi_threshold_filename}'
+        # ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
+        # gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
+        # lon_ndvi_ndwi,lat_ndvi_ndwi = get_lonlat_gdf(gdf_ndvi_ndwi_threshold)
+        # idx_subset_day = get_idx_subset_day(time_i2,gdf_conv_hull.day[i])
+        # lon_subset_day = lon_i2[idx_subset_day]
+        # lat_subset_day = lat_i2[idx_subset_day]
+        # height_subset_day = height_i2[idx_subset_day]
+        # time_subset_day = time_i2[idx_subset_day]
 
-        landmask = landmask_csv(lon_subset_day,lat_subset_day,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
-        lon_masked = lon_subset_day[landmask]
-        lat_masked = lat_subset_day[landmask]
-        height_masked = height_subset_day[landmask]
-        time_masked = time_subset_day[landmask]
+        # landmask = landmask_csv(lon_subset_day,lat_subset_day,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
+        # lon_masked = lon_subset_day[landmask]
+        # lat_masked = lat_subset_day[landmask]
+        # height_masked = height_subset_day[landmask]
+        # time_masked = time_subset_day[landmask]
 
-        output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
-        np.savetxt(output_file,np.c_[lon_masked,lat_masked,height_masked,time_masked.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
-        t_end = datetime.datetime.now()
-        dt = t_end - t_start
-        print(f'Applying filter took {dt.seconds + dt.microseconds/1e6:.1f} s.')
+        # output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
+        # np.savetxt(output_file,np.c_[lon_masked,lat_masked,height_masked,time_masked.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
+        # t_end = datetime.datetime.now()
+        # dt = t_end - t_start
+        # print(f'Applying filter took {dt.seconds + dt.microseconds/1e6:.1f} s.')
     
     file_list = sorted(glob.glob(f'{tmp_dir}{loc_name}_*_Filtered_NDVI_NDWI.txt'))
     output_full_file = input_file.replace('.txt','_Filtered_NDVI_NDWI.txt')
