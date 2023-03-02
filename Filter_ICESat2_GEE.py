@@ -483,11 +483,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file',help='Path to csv to filter')
     parser.add_argument('--cpus',help='Number of cpus to use',default=1)
+    parser.add_argument('--machine',help='Machine name',default='t')
     args = parser.parse_args()
     input_file = args.input_file
     N_cpus = int(args.cpus)
+    machine_name = args.machine
 
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
+
+    if machine_name == 'b':
+        tmp_dir = tmp_dir.replace('/BhaltosMount/Bhaltos/','/Bhaltos/willismi/')
+    elif machine_name == 'local':
+        tmp_dir = tmp_dir.replace('/BhaltosMount/Bhaltos/EDUARD/','/home/heijkoop/Desktop/Projects/')
 
     df = pd.read_csv(input_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
     df['day'] = [t[:10] for t in df.time]
