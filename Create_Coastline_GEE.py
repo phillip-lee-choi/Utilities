@@ -106,9 +106,8 @@ def get_strip_extents(strip):
     lat_max = np.nanmax(lat_strip)
     return lon_min,lon_max,lat_min,lat_max
 
-def get_s2_image(polygon,s2,s2_cloud_probability,CLOUD_FILTER):
-    i_date = (datetime.datetime.now() - datetime.timedelta(days=180)).strftime("%Y-%m-%d")
-    f_date = datetime.datetime.now().strftime("%Y-%m-%d")
+def get_s2_image(polygon,s2,s2_cloud_probability,CLOUD_FILTER,
+                 i_date=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime("%Y-%m-%d"),f_date=datetime.datetime.now().strftime("%Y-%m-%d")):
     s2_date_region = s2.filterDate(i_date,f_date).filterBounds(polygon)
     s2_cloud_probability_date_region = s2_cloud_probability.filterDate(i_date,f_date).filterBounds(polygon)
     s2_merged_date_region = ee.ImageCollection(ee.Join.saveFirst('s2cloudless').apply(**{
@@ -364,11 +363,15 @@ def main():
     parser.add_argument('--input', help='Input location with DSMs.',default=None)
     parser.add_argument('--lonlat', help='Input lonlat extents (lon_min,lon_max,lat_min,lat_max).',nargs=4,default=None)
     parser.add_argument('--loc_name', help='Location name.',default=None)
+    parser.add_argument('--t_start',help='Start date in YYYY-MM-DD format.',default=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime("%Y-%m-%d"))
+    parser.add_argument('--t_end',help='End date in YYYY-MM-DD format.',default=datetime.datetime.now().strftime('%Y-%m-%d'))
     parser.add_argument('--simplify_radius',help='Radius with which to simplify coastline.',default=None)
     args = parser.parse_args()
     input_location = args.input
     lonlat_extents = args.lonlat
     loc_name = args.loc_name
+    t_start = args.t_start
+    t_end = args.t_end
     simplify_radius = int(args.simplify_radius)
     error_code = error_handling(input_location,lonlat_extents,loc_name)
     if error_code == 1:
@@ -415,7 +418,7 @@ def main():
     geometry_xy = [[x,y] for x,y in zip(gdf_extents.exterior[0].xy[0],gdf_extents.exterior[0].xy[1])]
     extents_polygon = ee.Geometry.Polygon(geometry_xy)
 
-    s2_median = get_s2_image(extents_polygon,s2,s2_cloud_probability,CLOUD_FILTER)
+    s2_median = get_s2_image(extents_polygon,s2,s2_cloud_probability,CLOUD_FILTER,t_start,t_end)
     andwi_threshold = get_ANDWI_threshold(s2_median,NDWI_THRESHOLD)
 
     andwi_threshold_filename = f'{loc_name}_S2_ANDWI_threshold.tif'
