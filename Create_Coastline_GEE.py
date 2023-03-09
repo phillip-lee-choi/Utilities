@@ -378,10 +378,15 @@ def main():
         sys.exit()
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
 
-    if loc_name is None:
-        loc_name = input_location.split('/')[-2]
     if input_location is None:
         input_location = tmp_dir
+    if input_location[-1] != '/':
+        input_location += '/'
+    if loc_name is None:
+        loc_name = input_location.split('/')[-2]
+    if os.path.isdir(f'{input_location}Coast') == False:
+        os.mkdir(f'{input_location}Coast')
+    coast_dir = f'{input_location}Coast/'
 
     output_folder_gdrive = f'GEE_{loc_name}'
     
@@ -434,13 +439,13 @@ def main():
     dt = t_end - t_start
     print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
     t_start = datetime.datetime.now()
-    download_code = download_img_google_drive(andwi_threshold_filename,output_folder_gdrive,input_location,token_json,credentials_json,SCOPES)
+    download_code = download_img_google_drive(andwi_threshold_filename,output_folder_gdrive,coast_dir,token_json,credentials_json,SCOPES)
     if download_code is None:
         print('Could not download image from Google Drive.')
         sys.exit()
-    andwi_threshold_local_file = f'{input_location}{andwi_threshold_filename}'
-    andwi_coastline_tif_file = f'{input_location}{loc_name}_S2_ANDWI_Coastline.tif'
-    andwi_surface_water_tif_file = f'{input_location}{loc_name}_S2_ANDWI_Surface_Water.tif'
+    andwi_threshold_local_file = f'{coast_dir}{andwi_threshold_filename}'
+    andwi_coastline_tif_file = f'{coast_dir}{loc_name}_S2_ANDWI_Coastline.tif'
+    andwi_surface_water_tif_file = f'{coast_dir}{loc_name}_S2_ANDWI_Surface_Water.tif'
     src_andwi = gdal.Open(andwi_threshold_local_file)
     andwi_data = np.asarray(src_andwi.GetRasterBand(1).ReadAsArray())
     surface_water_data = connected_components(andwi_data)
@@ -453,8 +458,8 @@ def main():
     Add code to simplify to ~10 m or 20 m
     '''
     if simplify_radius is not None:
-        simplified_coastline_shp_file = f'{input_location}{loc_name}_S2_ANDWI_Coastline_Simplified.shp'
-        simplified_surface_water_shp_file = f'{input_location}{loc_name}_S2_ANDWI_Surface_Water_Simplified.shp'
+        simplified_coastline_shp_file = f'{coast_dir}{loc_name}_S2_ANDWI_Coastline_Simplified.shp'
+        simplified_surface_water_shp_file = f'{coast_dir}{loc_name}_S2_ANDWI_Surface_Water_Simplified.shp'
         gdf_coastline = gpd.read_file(andwi_coastline_shp_file)
         gdf_surface_water = gpd.read_file(andwi_surface_water_shp_file)
         lon_min,lon_max,lat_min,lat_max = get_lonlat_bounds_gdf(gdf_coastline)
