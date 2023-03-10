@@ -14,6 +14,7 @@ import ctypes as c
 import glob
 import io
 import multiprocessing
+import itertools
 
 import google.auth.transport.requests #Request
 import google.oauth2.credentials #Credentials
@@ -220,20 +221,20 @@ def csv_to_convex_hull_shp(df,csv_file,writing=True):
         gdf.to_file(output_file)
     return gdf
 
-def find_s2_image(day,geometry,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
+def find_s2_image(day,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist):
     csv_day_ee = ee.Date.parse('YYYY-MM-dd',day)
     csv_geometry = geometry
     csv_geometry_bounds = csv_geometry.bounds
     csv_geometry_xy = [[x,y] for x,y in zip(csv_geometry.exterior.xy[0],csv_geometry.exterior.xy[1])]
     polygon = ee.Geometry.Polygon(csv_geometry_xy)
-    i_date = datetime.datetime.strptime(day,'%Y-%m-%d') - datetime.timedelta(days=DT_SEARCH)
+    i_date = datetime.datetime.strptime(day,'%Y-%m-%d') - datetime.timedelta(days=dt_search)
     i_date = i_date.strftime('%Y-%m-%d')
-    f_date = datetime.datetime.strptime(day,'%Y-%m-%d') + datetime.timedelta(days=DT_SEARCH+1) #because f_date is exclusive
+    f_date = datetime.datetime.strptime(day,'%Y-%m-%d') + datetime.timedelta(days=dt_search+1) #because f_date is exclusive
     f_date = f_date.strftime('%Y-%m-%d')
     s2_date_region = s2.filterDate(i_date,f_date).filterBounds(polygon)
     s2_cloud_probability_date_region = s2_cloud_probability.filterDate(i_date,f_date).filterBounds(polygon)
     s2_merged_date_region = ee.ImageCollection(ee.Join.saveFirst('s2cloudless').apply(**{
-        'primary':s2_date_region.filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', CLOUD_FILTER)),
+        'primary':s2_date_region.filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloud_filter)),
         'secondary':s2_cloud_probability_date_region,
         'condition':ee.Filter.equals(**{
             'leftField':'system:index',
@@ -252,7 +253,7 @@ def find_s2_image(day,geometry,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BU
     s2_subset = (ymd_ee.map(lambda date : s2_merged_date_region.filterMetadata('system:index','contains', date)))
     overlap_ratio = ee.Array(s2_subset.map(lambda img : ee.ImageCollection(img).geometry().intersection(polygon).area().divide(polygon.area())))
     filtered_clouds_single_day = s2_subset.map(lambda img : ee.ImageCollection(img).map(lambda img2 : img2.clip(polygon)))
-    filtered_clouds_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).map(lambda img2 : add_cloud_shadow_mask(img2,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)))
+    filtered_clouds_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).map(lambda img2 : add_cloud_shadow_mask(img2,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)))
     cloudmask_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').selfMask())
     notcloudmask_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').neq(1).selfMask())
     n_clouds = ee.Array(cloudmask_single_day.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
@@ -402,39 +403,39 @@ def polygonize_tif(img):
     subprocess.run(polygonize_command,shell=True)
     return shp
 
-def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
+def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
     t_start = datetime.datetime.now()
     print(f'Working on {idx}...')
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
     s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
 
-    config_file = 'utils_config.ini'
-    config = configparser.ConfigParser()
-    config.read(config_file)
+    # config_file = 'utils_config.ini'
+    # config = configparser.ConfigParser()
+    # config.read(config_file)
+    tmp_dir = gee_dict['tmp_dir']
     output_folder_gdrive = f'GEE_{loc_name}'
-    tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
-    landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
+    landmask_c_file = gee_dict['landmask_c_file']
 
-    DT_SEARCH = config.getint('GEE_CONSTANTS','DT_SEARCH')
-    CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
-    CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
-    NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
-    CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
-    BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
-    OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
-    SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
-    NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
-    NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
-    SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
-    token_json = config.get('GDRIVE_PATHS','token_json')
-    credentials_json = config.get('GDRIVE_PATHS','credentials_json')
+    dt_search = gee_dict['DT_SEARCH']
+    cloud_filter = gee_dict['CLOUD_FILTER']
+    cld_prb_thresh = gee_dict['CLD_PRB_THRESH']
+    nir_drk_thresh = gee_dict['NIR_DRK_THRESH']
+    cld_prj_dist = gee_dict['CLD_PRJ_DIST']
+    buffer = gee_dict['BUFFER']
+    # OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
+    sr_band_scale = gee_dict['SR_BAND_SCALE']
+    ndvi_threshold = gee_dict['GEE_CONSTANTS','NDVI_THRESHOLD']
+    ndwi_threshold = gee_dict['GEE_CONSTANTS','NDWI_THRESHOLD']
+    scopes = gee_dict['GENERAL_CONSTANTS','SCOPES']
+    token_json = gee_dict['GDRIVE_PATHS','token_json']
+    credentials_json = gee_dict['GDRIVE_PATHS','credentials_json']
 
     i2_ymd = day.replace('-','')
-    s2_image,s2_ymd,s2_geometry = find_s2_image(day,geometry,s2,s2_cloud_probability,DT_SEARCH,CLOUD_FILTER,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)
+    s2_image,s2_ymd,s2_geometry = find_s2_image(day,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)
     if s2_image is None:
         print(f'No suitable Sentinel-2 data for {idx}.')
         return 0
-    ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD)
+    ndvi_ndwi_threshold = get_NDVI_ANDWI_threshold(s2_image,ndvi_threshold,ndwi_threshold)
     ndvi_ndwi_threshold_filename = f'{loc_name}_ATL03_{i2_ymd}_S2_{s2_ymd}_NDVI_NDWI_threshold.tif'
     export_code = export_to_drive(ndvi_ndwi_threshold,ndvi_ndwi_threshold_filename,s2_geometry,loc_name)
     if export_code is None:
@@ -445,7 +446,7 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file):
     print(f'Processing Sentinel-2 for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
 
     t_start = datetime.datetime.now()
-    download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,SCOPES)
+    download_code = download_img_google_drive(ndvi_ndwi_threshold_filename,output_folder_gdrive,tmp_dir,token_json,credentials_json,scopes)
     if download_code is None:
         print(f'Could not download image {idx} from Google Drive.')
         return 0
@@ -490,11 +491,33 @@ def main():
     machine_name = args.machine
 
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
-
     if machine_name == 'b':
         tmp_dir = tmp_dir.replace('/BhaltosMount/Bhaltos/','/Bhaltos/willismi/')
     elif machine_name == 'local':
         tmp_dir = tmp_dir.replace('/BhaltosMount/Bhaltos/EDUARD/','/home/heijkoop/Desktop/Projects/')
+
+    DT_SEARCH = config.getint('GEE_CONSTANTS','DT_SEARCH')
+    CLOUD_FILTER = config.getint('GEE_CONSTANTS','CLOUD_FILTER')
+    CLD_PRB_THRESH = config.getint('GEE_CONSTANTS','CLD_PRB_THRESH')
+    NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
+    CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
+    BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
+    OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
+    SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
+    NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
+    NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
+    SCOPES = config.get('GENERAL_CONSTANTS','SCOPES')
+    token_json = config.get('GDRIVE_PATHS','token_json')
+    credentials_json = config.get('GDRIVE_PATHS','credentials_json')
+    landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
+
+    gee_dict = {'DT_SEARCH':DT_SEARCH,'CLOUD_FILTER':CLOUD_FILTER,'CLD_PRB_THRESH':CLD_PRB_THRESH,
+                'NIR_DRK_THRESH':NIR_DRK_THRESH,'CLD_PRJ_DIST':CLD_PRJ_DIST,'BUFFER':BUFFER,
+                'OVERLAP_MINIMUM':OVERLAP_MINIMUM,'SR_BAND_SCALE':SR_BAND_SCALE,
+                'NDVI_THRESHOLD':NDVI_THRESHOLD,'NDWI_THRESHOLD':NDWI_THRESHOLD,
+                'SCOPES':SCOPES,'token_json':token_json,'credentials_json':credentials_json,
+                'landmask_c_file':landmask_c_file,'tmp_dir':tmp_dir
+                }
 
     df = pd.read_csv(input_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
     df['day'] = [t[:10] for t in df.time]
@@ -513,9 +536,10 @@ def main():
     subset_file_array = np.asarray(sorted(glob.glob(f'{tmp_dir}{loc_name}*_ATL03.txt')))
 
     t_start_full = datetime.datetime.now()
+    ir = itertools.repeat
 
     p = multiprocessing.Pool(N_cpus)
-    p.starmap(parallel_s2_image,zip(index_array,day_array,geometry_array,loc_name_array,subset_file_array))
+    p.starmap(parallel_s2_image,zip(index_array,day_array,geometry_array,loc_name_array,subset_file_array,ir(gee_dict)))
     p.close()
 
     file_list = sorted(glob.glob(f'{tmp_dir}{loc_name}_*_Filtered_NDVI_NDWI.txt'))
