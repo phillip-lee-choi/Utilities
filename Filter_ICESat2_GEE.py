@@ -424,11 +424,11 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
     buffer = gee_dict['BUFFER']
     # OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
     sr_band_scale = gee_dict['SR_BAND_SCALE']
-    ndvi_threshold = gee_dict['GEE_CONSTANTS','NDVI_THRESHOLD']
-    ndwi_threshold = gee_dict['GEE_CONSTANTS','NDWI_THRESHOLD']
-    scopes = gee_dict['GENERAL_CONSTANTS','SCOPES']
-    token_json = gee_dict['GDRIVE_PATHS','token_json']
-    credentials_json = gee_dict['GDRIVE_PATHS','credentials_json']
+    ndvi_threshold = gee_dict['NDVI_THRESHOLD']
+    ndwi_threshold = gee_dict['NDWI_THRESHOLD']
+    scopes = gee_dict['SCOPES']
+    token_json = gee_dict['token_json']
+    credentials_json = gee_dict['credentials_json']
 
     i2_ymd = day.replace('-','')
     s2_image,s2_ymd,s2_geometry = find_s2_image(day,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)
