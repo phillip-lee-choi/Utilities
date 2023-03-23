@@ -8,14 +8,14 @@ from osgeo import gdal,gdalconst,osr
 
 
 
-def sample_raster(raster_path, csv_path, output_file):
+def sample_raster(raster_path, csv_path, output_file,nodata='-9999'):
     cat_command = f"cat {csv_path} | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -wgs84 {raster_path} > tmp.txt"
     subprocess.run(cat_command,shell=True)
     fill_nan_command = f"awk '!NF{{$0=\"NaN\"}}1' tmp.txt > tmp2.txt"
     subprocess.run(fill_nan_command,shell=True)
     paste_command = f"paste -d , {csv_path} tmp2.txt > {output_file}"
     subprocess.run(paste_command,shell=True)
-    subprocess.run(f"sed -i '/-9999/d' {output_file}",shell=True)
+    subprocess.run(f"sed -i '/{nodata}/d' {output_file}",shell=True)
     subprocess.run(f"sed -i '/NaN/d' {output_file}",shell=True)
     subprocess.run(f"sed -i '/nan/d' {output_file}",shell=True)
     subprocess.run(f"rm tmp.txt tmp2.txt",shell=True)
@@ -95,6 +95,7 @@ def main():
     parser.add_argument('--resample',default=False,action='store_true')
     parser.add_argument('--keep_original_sample',default=False,action='store_true')
     parser.add_argument('--no_writing',default=False,action='store_true')
+    parser.add_argument('--nodata', nargs='?', type=str)
 
     args = parser.parse_args()
     raster_path = args.raster
@@ -106,6 +107,7 @@ def main():
     resample_flag = args.resample
     keep_original_sample_flag = args.keep_original_sample
     no_writing_flag = args.no_writing
+    nodata_value = args.nodata
     if np.logical_xor(mean_mode,median_mode) == True:
         if mean_mode == True:
             mean_median_mode = 'mean'
@@ -117,7 +119,7 @@ def main():
     
 
     sampled_file = f'{os.path.splitext(csv_path)[0]}_Sampled_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(csv_path)[1]}'
-    sample_code = sample_raster(raster_path, csv_path, sampled_file)
+    sample_code = sample_raster(raster_path, csv_path, sampled_file,nodata=nodata_value)
     if sample_code is not None:
         print('Error in sampling raster.')
     df_sampled_original = pd.read_csv(sampled_file,header=None,names=['lon','lat','height_icesat2','time','height_dem'],dtype={'lon':'float','lat':'float','height_icesat2':'float','time':'str','height_dem':'float'})
@@ -132,7 +134,7 @@ def main():
 
     if resample_flag == True:
         resampled_file = f'{os.path.splitext(output_csv)[0]}_Sampled_Coregistered_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(output_csv)[1]}'
-        resample_code = sample_raster(raster_shifted, output_csv, resampled_file)
+        resample_code = sample_raster(raster_shifted, output_csv, resampled_file,nodata=nodata_value)
         if resample_code is not None:
             print('Error in sampling co-registered raster.')
     if keep_original_sample_flag == False:
