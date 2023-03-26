@@ -95,7 +95,7 @@ def main():
     parser.add_argument('--resample',default=False,action='store_true')
     parser.add_argument('--keep_original_sample',default=False,action='store_true')
     parser.add_argument('--no_writing',default=False,action='store_true')
-    parser.add_argument('--nodata', nargs='?', type=str)
+    parser.add_argument('--nodata', nargs='?', type=str,default='-9999')
 
     args = parser.parse_args()
     raster_path = args.raster
