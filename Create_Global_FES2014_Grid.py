@@ -263,41 +263,8 @@ def prep_minor_tide_inference(t,DELTAT):
     th = (arg + u)*dtr
     return th,f
 
-def compute_tides(lon,lat,utc_time,model_dir):
-    '''
-    Assumes utc_time is in datetime format
-    lon/lat as flattened meshgrid arrays
-    '''
-    delta_file = pyTMD.utilities.get_data_path(['data','merged_deltat.data'])
-    model = pyTMD.model(model_dir,format='netcdf',compressed=False).elevation('FES2014')
-    constituents = model.constituents
-    amp,ph = extract_FES_constants(np.atleast_1d(lon),
-            np.atleast_1d(lat), model.model_file, TYPE=model.type,
-            VERSION=model.version, METHOD='spline', EXTRAPOLATE=False,
-            SCALE=model.scale, GZIP=model.compressed)
-    idx_no_data = np.unique(np.where(amp.mask == True)[0])
-    amp = np.delete(amp,idx_no_data,axis=0)
-    ph = np.delete(ph,idx_no_data,axis=0)
-    lon = np.delete(lon,idx_no_data)
-    lat = np.delete(lat,idx_no_data)
-
-    YMD = np.asarray([t.date() for t in utc_time])
-    seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
-    tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(YMD,seconds)])
-    DELTAT = calc_delta_time(delta_file, tide_time)
-    cph = -1j*ph*np.pi/180.0
-    hc = amp*np.exp(cph)
-    pu,pf,G = load_nodal_corrections(np.atleast_1d(tide_time) + 48622.0, constituents,DELTAT=DELTAT, CORRECTIONS=model.format)
-    th = G*np.pi/180 + pu
-    pf_costh = (pf*np.cos(th)).transpose()
-    pf_sinth = (pf*np.sin(th)).transpose()
-    hc_real = hc.data.real
-    hc_imag = hc.data.imag
-    tide_min = np.zeros(len(lon))
-    tide_max = np.zeros(len(lon))
-    th_minor,f_minor = prep_minor_tide_inference(tide_time,DELTAT)
-
-    Z_matrix = np.array([
+def get_z_matrix():
+    z_matrix = np.array([
         [0.263,-0.0252,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
         [0.297,-0.0264,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
         [0.164,0.0048,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
@@ -319,7 +286,45 @@ def compute_tides(lon,lat,utc_time,model_dir):
         [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
         [0.0,0.0,0.0,0.0,0.0,-0.0034925,0.0,0.0831707,0.0],
     ])
-    
+    return z_matrix
+
+def compute_tides(lon,lat,utc_time,model_dir):
+    '''
+    Assumes utc_time is in datetime format
+    lon/lat as flattened meshgrid arrays
+    '''
+    delta_file = pyTMD.utilities.get_data_path(['data','merged_deltat.data'])
+    model = pyTMD.model(model_dir,format='netcdf',compressed=False).elevation('FES2014')
+    constituents = model.constituents
+    amp,ph = extract_FES_constants(np.atleast_1d(lon),
+            np.atleast_1d(lat), model.model_file, TYPE=model.type,
+            VERSION=model.version, METHOD='spline', EXTRAPOLATE=False,
+            SCALE=model.scale, GZIP=model.compressed)
+    idx_no_data = np.unique(np.where(amp.mask == True)[0])
+    amp = np.delete(amp,idx_no_data,axis=0)
+    ph = np.delete(ph,idx_no_data,axis=0)
+    lon = np.delete(lon,idx_no_data)
+    lat = np.delete(lat,idx_no_data)
+    ymd = np.asarray([t.date() for t in utc_time])
+    delta_days = np.asarray([y.days for y in ymd-ymd[0]]) #working with integers is much faster than datetime objects
+    unique_delta_days = np.unique(delta_days)
+    seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
+    tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(ymd,seconds)])
+    deltat = calc_delta_time(delta_file, tide_time)
+    cph = -1j*ph*np.pi/180.0
+    hc = amp*np.exp(cph)
+    pu,pf,G = load_nodal_corrections(np.atleast_1d(tide_time) + 48622.0, constituents,DELTAT=deltat, CORRECTIONS=model.format)
+    th = G*np.pi/180 + pu
+    pf_costh = (pf*np.cos(th)).transpose()
+    pf_sinth = (pf*np.sin(th)).transpose()
+    hc_real = hc.data.real
+    hc_imag = hc.data.imag
+    tide_min = np.zeros(len(lon))
+    tide_max = np.zeros(len(lon))
+    mhhw = np.zeros(len(lon))
+    mllw = np.zeros(len(lon))
+    th_minor,f_minor = prep_minor_tide_inference(tide_time,deltat)
+    Z_matrix = get_z_matrix()
     f_costh = f_minor * np.cos(th_minor)
     f_sinth = f_minor * np.sin(th_minor)
     minor = ['2q1','sigma1','rho1','m12','m11','chi1','pi1','phi1','theta1',
@@ -335,15 +340,20 @@ def compute_tides(lon,lat,utc_time,model_dir):
     zmin = zmin[:,minor_indices]
     zmin_real = zmin.real
     zmin_imag = zmin.imag
-
     for i in range(len(lon)):
         tmp_tide = np.dot(hc_real[i,:],pf_costh) - np.dot(hc_imag[i,:],pf_sinth)
         tmp_minor = np.dot(zmin_real[i,:],f_costh) - np.dot(zmin_imag[i,:],f_sinth)
         tmp_tide += tmp_minor
         tide_min[i] = np.min(tmp_tide)
         tide_max[i] = np.max(tmp_tide)
-
-    return lon,lat,tide_min,tide_max
+        llw = np.zeros(len(unique_delta_days))
+        hhw = np.zeros(len(unique_delta_days))
+        for j in range(len(unique_delta_days)):
+            llw[j] = np.min(tmp_tide[delta_days == unique_delta_days[j]])
+            hhw[j] = np.max(tmp_tide[delta_days == unique_delta_days[j]])
+        mhhw[i] = np.mean(hhw)
+        mllw[i] = np.mean(llw)
+    return lon,lat,tide_min,tide_max,mhhw,mllw
 
 def main():
     config_file = 'utils_config.ini'
@@ -470,8 +480,8 @@ def main():
         lat_array = lat_array[landmask == 1]
         print('Mask complete.')
     print('Running tides...')
-    lon_tide,lat_tide,tide_min,tide_max = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
-    np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max],fmt='%.4f,%.4f,%.4f,%.4f',delimiter=',')
+    lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
+    np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw],fmt='%.4f,%.4f,%.4f,%.4f,%.4f,%.4f',delimiter=',',comments='',header='lon,lat,tide_min,tide_max,MHHW,MLLW')
     print('Tides complete.')
 
 if __name__ == '__main__':
