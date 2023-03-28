@@ -347,7 +347,7 @@ def compute_tides(lon,lat,utc_time,model_dir,N_cpus):
     idx = np.arange(len(lon))
     print('Finished pre-processing.')
     p = multiprocessing.Pool(N_cpus)
-    tides_tuple = p.starmap(parallel_tides,zip(lon,lat,idx,
+    tides_tuple = p.starmap(parallel_tides,zip(idx,
                                                ir(hc_real),ir(hc_imag),ir(pf_costh),ir(pf_sinth),
                                                ir(zmin_real),ir(zmin_imag),ir(f_costh),ir(f_sinth),
                                                ir(idx_delta_days)))
