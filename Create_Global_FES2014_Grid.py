@@ -8,6 +8,8 @@ import netCDF4 as nc
 import subprocess
 import ctypes as c
 import shapely
+import itertools
+import multiprocessing
 
 import pyTMD.time
 import pyTMD.model
@@ -288,11 +290,12 @@ def get_z_matrix():
     ])
     return z_matrix
 
-def compute_tides(lon,lat,utc_time,model_dir):
+def compute_tides(lon,lat,utc_time,model_dir,N_cpus):
     '''
     Assumes utc_time is in datetime format
     lon/lat as flattened meshgrid arrays
     '''
+    print('Pre-processing...')
     delta_file = pyTMD.utilities.get_data_path(['data','merged_deltat.data'])
     model = pyTMD.model(model_dir,format='netcdf',compressed=False).elevation('FES2014')
     constituents = model.constituents
@@ -307,7 +310,7 @@ def compute_tides(lon,lat,utc_time,model_dir):
     lat = np.delete(lat,idx_no_data)
     ymd = np.asarray([t.date() for t in utc_time])
     delta_days = np.asarray([y.days for y in ymd-ymd[0]]) #working with integers is much faster than datetime objects
-    unique_delta_days = np.unique(delta_days)
+    unique_delta_days,idx_delta_days = np.unique(delta_days,return_index=True)
     seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
     tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(ymd,seconds)])
     deltat = calc_delta_time(delta_file, tide_time)
@@ -340,20 +343,34 @@ def compute_tides(lon,lat,utc_time,model_dir):
     zmin = zmin[:,minor_indices]
     zmin_real = zmin.real
     zmin_imag = zmin.imag
-    for i in range(len(lon)):
-        tmp_tide = np.dot(hc_real[i,:],pf_costh) - np.dot(hc_imag[i,:],pf_sinth)
-        tmp_minor = np.dot(zmin_real[i,:],f_costh) - np.dot(zmin_imag[i,:],f_sinth)
-        tmp_tide += tmp_minor
-        tide_min[i] = np.min(tmp_tide)
-        tide_max[i] = np.max(tmp_tide)
-        llw = np.zeros(len(unique_delta_days))
-        hhw = np.zeros(len(unique_delta_days))
-        for j in range(len(unique_delta_days)):
-            llw[j] = np.min(tmp_tide[delta_days == unique_delta_days[j]])
-            hhw[j] = np.max(tmp_tide[delta_days == unique_delta_days[j]])
-        mhhw[i] = np.mean(hhw)
-        mllw[i] = np.mean(llw)
+    ir = itertools.repeat
+    idx = np.arange(len(lon))
+    print('Finished pre-processing.')
+    p = multiprocessing.Pool(N_cpus)
+    tides_tuple = p.starmap(parallel_tides,zip(lon,lat,idx,
+                                               ir(hc_real),ir(hc_imag),ir(pf_costh),ir(pf_sinth),
+                                               ir(zmin_real),ir(zmin_imag),ir(f_costh),ir(f_sinth),
+                                               ir(idx_delta_days)))
+    p.close()
+    tides_array = np.asarray(tides_tuple)
+    tide_min = tides_array[:,0]
+    tide_max = tides_array[:,1]
+    mllw = tides_array[:,2]
+    mhhw = tides_array[:,3]
     return lon,lat,tide_min,tide_max,mhhw,mllw
+
+def parallel_tides(i,hc_real,hc_imag,pf_costh,pf_sinth,zmin_real,zmin_imag,f_costh,f_sinth,idx_delta_days):
+    tmp_tide = np.dot(hc_real[i,:],pf_costh) - np.dot(hc_imag[i,:],pf_sinth)
+    tmp_minor = np.dot(zmin_real[i,:],f_costh) - np.dot(zmin_imag[i,:],f_sinth)
+    tmp_tide += tmp_minor
+    tide_min = np.min(tmp_tide)
+    tide_max = np.max(tmp_tide)
+    tide_split = np.split(tmp_tide,idx_delta_days[1:])
+    llw = np.min(tide_split,axis=1)
+    hhw = np.max(tide_split,axis=1)
+    mllw = np.mean(llw)
+    mhhw = np.mean(hhw)
+    return tide_min,tide_max,mllw,mhhw
 
 def main():
     config_file = 'utils_config.ini'
@@ -365,6 +382,7 @@ def main():
     parser.add_argument('--model_dir',help='Model directory',default=config.get('FES2014','model_dir'))
     parser.add_argument('--buffer',help='Flag if only coastal points should be used',action='store_true',default=False)
     parser.add_argument('--output_file',help='Output file')
+    parser.add_argument('--N_cpus',help='Number of CPUs to use',default='1')
     args = parser.parse_args()
     t_start = '2010-01-01 00:00:00'
     t_end = '2019-12-31 23:59:59'
@@ -372,6 +390,7 @@ def main():
     model_dir = args.model_dir
     output_file = args.output_file
     buffer_flag = args.buffer
+    N_cpus = int(args.N_cpus)
 
     date_range = pd.date_range(t_start,t_end,freq=f'{t_resolution}min')
     date_range_datetime = np.asarray([datetime.datetime.strptime(str(t),'%Y-%m-%d %H:%M:%S') for t in date_range])
@@ -480,7 +499,7 @@ def main():
         lat_array = lat_array[landmask == 1]
         print('Mask complete.')
     print('Running tides...')
-    lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw = compute_tides(lon_array,lat_array,date_range_datetime,model_dir)
+    lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw = compute_tides(lon_array,lat_array,date_range_datetime,model_dir,N_cpus)
     np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw],fmt='%.4f,%.4f,%.4f,%.4f,%.4f,%.4f',delimiter=',',comments='',header='lon,lat,tide_min,tide_max,MHHW,MLLW')
     print('Tides complete.')
 
