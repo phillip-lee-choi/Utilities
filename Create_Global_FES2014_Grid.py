@@ -395,7 +395,7 @@ def main():
     date_range = pd.date_range(t_start,t_end,freq=f'{t_resolution}min')
     date_range_datetime = np.asarray([datetime.datetime.strptime(str(t),'%Y-%m-%d %H:%M:%S') for t in date_range])
 
-    m2_file = f'{model_dir}/fes2014/ocean_tide/m2.nc'
+    m2_file = f'{model_dir}fes2014/ocean_tide/m2.nc'
     m2_data = nc.Dataset(m2_file)
     lon = np.asarray(m2_data['lon'][:])
     lat = np.asarray(m2_data['lat'][:])
