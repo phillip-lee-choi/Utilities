@@ -1,3 +1,9 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "8" # Need this so numpy.dot doesn't use all threads/cores
+os.environ["OPENBLAS_NUM_THREADS"] = "8"
+os.environ["MKL_NUM_THREADS"] = "8"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "8"
+os.environ["NUMEXPR_NUM_THREADS"] = "8"
 import datetime
 import argparse
 import configparser
@@ -9,12 +15,6 @@ import ctypes as c
 import shapely
 import itertools
 import multiprocessing
-import os
-os.environ["OMP_NUM_THREADS"] = "8" # Need this so numpy.dor doesn't use all threads/cores
-os.environ["OPENBLAS_NUM_THREADS"] = "8"
-os.environ["MKL_NUM_THREADS"] = "8"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "8"
-os.environ["NUMEXPR_NUM_THREADS"] = "8"
 
 import numpy as np
 
