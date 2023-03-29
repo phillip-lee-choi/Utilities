@@ -390,6 +390,7 @@ def main():
     parser.add_argument('--model_dir',help='Model directory',default=config.get('FES2014','model_dir'))
     parser.add_argument('--buffer',help='Flag if only coastal points should be used',action='store_true',default=False)
     parser.add_argument('--output_file',help='Output file')
+    parser.add_argument('--machine',help='Machine name',default='t')
     parser.add_argument('--N_cpus',help='Number of CPUs to use',default='1')
     args = parser.parse_args()
     t_start = '2010-01-01 00:00:00'
@@ -398,8 +399,13 @@ def main():
     model_dir = args.model_dir
     output_file = args.output_file
     buffer_flag = args.buffer
+    machine_name = args.machine
     N_cpus = int(args.N_cpus)
 
+    if machine_name == 'b':
+        model_dir = model_dir.replace('/BhaltosMount/Bhaltos/','/Bhaltos/willismi/')
+    elif machine_name == 'local':
+        model_dir = model_dir.replace('/BhaltosMount/Bhaltos/DATA_REPOSITORY/','/media/heijkoop/DATA/')
     date_range = pd.date_range(t_start,t_end,freq=f'{t_resolution}min')
     date_range_datetime = np.asarray([datetime.datetime.strptime(str(t),'%Y-%m-%d %H:%M:%S') for t in date_range])
 
@@ -426,8 +432,14 @@ def main():
         antimeridian = shapely.geometry.LineString([[180.0,90.0],[180.0,-90.0]])
         meridian = shapely.geometry.LineString([[0.0,90.0],[0.0,-90.0]])
         coast_dir = config.get('COAST','coast_dir')
+        if machine_name == 'b':
+            coast_dir = coast_dir.replace('/BhaltosMount/Bhaltos/','/Bhaltos/willismi/')
+        elif machine_name == 'local':
+            coast_dir = coast_dir.replace('/BhaltosMount/Bhaltos/DATA_REPOSITORY/','/media/heijkoop/DATA/')
         coast_shp = f'{coast_dir}{res}/GSHHS_{res}_L1.shp'
         landmask_c_file = config.get('GENERAL_PATHS','landmask_c_file')
+        if machine_name == 'local':
+            landmask_c_file = landmask_c_file.replace('/home/eheijkoop/Scripts/','/media/heijkoop/DATA/Dropbox/TU/Phd/Github/')
         gdf_coast = gpd.read_file(coast_shp)
         gdf_coast_orig = gdf_coast.copy()
         gdf_coast = gdf_coast.to_crs('EPSG:3857')
