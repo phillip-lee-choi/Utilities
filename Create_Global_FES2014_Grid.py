@@ -346,17 +346,25 @@ def compute_tides(lon,lat,utc_time,model_dir,N_cpus):
     ir = itertools.repeat
     idx = np.arange(len(lon))
     print('Finished pre-processing.')
-    p = multiprocessing.Pool(N_cpus)
-    tides_tuple = p.starmap(parallel_tides,zip(idx,
-                                               ir(hc_real),ir(hc_imag),ir(pf_costh),ir(pf_sinth),
-                                               ir(zmin_real),ir(zmin_imag),ir(f_costh),ir(f_sinth),
-                                               ir(idx_delta_days)))
-    p.close()
-    tides_array = np.asarray(tides_tuple)
-    tide_min = tides_array[:,0]
-    tide_max = tides_array[:,1]
-    mllw = tides_array[:,2]
-    mhhw = tides_array[:,3]
+    if N_cpus > 1:
+        p = multiprocessing.Pool(N_cpus)
+        tides_tuple = p.starmap(parallel_tides,zip(idx,
+                                                ir(hc_real),ir(hc_imag),ir(pf_costh),ir(pf_sinth),
+                                                ir(zmin_real),ir(zmin_imag),ir(f_costh),ir(f_sinth),
+                                                ir(idx_delta_days)))
+        p.close()
+        tides_array = np.asarray(tides_tuple)
+        tide_min = tides_array[:,0]
+        tide_max = tides_array[:,1]
+        mllw = tides_array[:,2]
+        mhhw = tides_array[:,3]
+    else:
+        tide_min = np.zeros(len(lon))
+        tide_max = np.zeros(len(lon))
+        mhhw = np.zeros(len(lon))
+        mllw = np.zeros(len(lon))
+        for i in range(len(lon)):
+            tide_min[i],tide_max[i],mllw[i],mhhw[i] = parallel_tides(i,hc_real,hc_imag,pf_costh,pf_sinth,zmin_real,zmin_imag,f_costh,f_sinth,idx_delta_days)
     return lon,lat,tide_min,tide_max,mhhw,mllw
 
 def parallel_tides(i,hc_real,hc_imag,pf_costh,pf_sinth,zmin_real,zmin_imag,f_costh,f_sinth,idx_delta_days):
