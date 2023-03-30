@@ -527,7 +527,7 @@ def main():
         print('Mask complete.')
     print('Running tides...')
     lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw = compute_tides(lon_array,lat_array,date_range_datetime,model_dir,N_cpus)
-    np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max,mhhw,mllw],fmt='%.4f,%.4f,%.4f,%.4f,%.4f,%.4f',delimiter=',',comments='',header='lon,lat,tide_min,tide_max,MHHW,MLLW')
+    np.savetxt(output_file,np.c_[lon_tide,lat_tide,tide_min,tide_max,mllw,mhhw],fmt='%.4f,%.4f,%.4f,%.4f,%.4f,%.4f',delimiter=',',comments='',header='lon,lat,tide_min,tide_max,MLLW,MHHW')
     print('Tides complete.')
 
 if __name__ == '__main__':
