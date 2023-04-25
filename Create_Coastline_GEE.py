@@ -362,6 +362,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', help='Input location with DSMs.',default=None)
     parser.add_argument('--lonlat', help='Input lonlat extents (lon_min,lon_max,lat_min,lat_max).',nargs=4,default=None)
+    parser.add_argument('--machine',help='Machine name',default='t')
     parser.add_argument('--loc_name', help='Location name.',default=None)
     parser.add_argument('--t_start',help='Start date in YYYY-MM-DD format.',default=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime("%Y-%m-%d"))
     parser.add_argument('--t_end',help='End date in YYYY-MM-DD format.',default=datetime.datetime.now().strftime('%Y-%m-%d'))
@@ -369,6 +370,7 @@ def main():
     args = parser.parse_args()
     input_location = args.input
     lonlat_extents = args.lonlat
+    machine_name = args.machine
     loc_name = args.loc_name
     t_start = args.t_start
     t_end = args.t_end
@@ -376,7 +378,12 @@ def main():
     error_code = error_handling(input_location,lonlat_extents,loc_name)
     if error_code == 1:
         sys.exit()
+
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
+    if machine_name == 'b':
+        tmp_dir = tmp_dir.replace('/BhaltosMount/Bhaltos/','/Bhaltos/willismi/')
+    elif machine_name == 'local':
+        tmp_dir = tmp_dir.replace('/BhaltosMount/Bhaltos/EDUARD/','/home/heijkoop/Desktop/Projects/')
 
     if input_location is None:
         input_location = tmp_dir
