@@ -400,6 +400,7 @@ def main():
     corrected_flag = False
     dir_structure = 'sealevel'
 
+    t_start_process1 = datetime.datetime.now()
     if lonlat_extents is None:
         strip_list = get_strip_list(input_location,input_type,corrected_flag,dir_structure)
         if len(strip_list) == 0:
@@ -435,10 +436,10 @@ def main():
         if export_code is None:
             print('Google Drive export failed.')
             sys.exit()
-    t_end = datetime.datetime.now()
-    dt = t_end - t_start
-    print(f'Processing Sentinel-2 took {dt.seconds + dt.microseconds/1e6:.1f} s.')
-    t_start = datetime.datetime.now()
+    t_end_process1 = datetime.datetime.now()
+    dt_process1 = t_end_process1 - t_start_process1
+    print(f'Processing Sentinel-2 took {dt_process1.seconds + dt_process1.microseconds/1e6:.1f} s.')
+    t_start_process2 = datetime.datetime.now()
     download_code = download_img_google_drive(andwi_threshold_filename,output_folder_gdrive,coast_dir,token_json,credentials_json,SCOPES)
     if download_code is None:
         print('Could not download image from Google Drive.')
@@ -480,9 +481,9 @@ def main():
 
 
 
-    t_end = datetime.datetime.now()
-    dt = t_end - t_start
-    print(f'Processing image took {dt.seconds + dt.microseconds/1e6:.1f} s.')
+    t_end_process2 = datetime.datetime.now()
+    dt_process2 = t_end_process2 - t_start_process2
+    print(f'Processing image took {dt_process2.seconds + dt_process2.microseconds/1e6:.1f} s.')
 
 if __name__ == '__main__':
     main()
