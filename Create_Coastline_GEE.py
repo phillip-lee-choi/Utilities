@@ -346,6 +346,22 @@ def simplify_polygon(geom,threshold):
     new_geom = geom.simplify(threshold)
     return new_geom
 
+def compress_raster(filename,nodata=-9999,quiet_flag=False):
+    '''
+    Compress a raster using gdal_translate
+    '''
+    file_ext = os.path.splitext(filename)[-1]
+    tmp_filename = filename.replace(file_ext,f'_LZW{file_ext}')
+    if nodata is not None:
+        compress_command = f'gdal_translate -co "COMPRESS=LZW" -co "BIGTIFF=IF_SAFER" -a_nodata {nodata} {filename} {tmp_filename}'
+    else:
+        compress_command = f'gdal_translate -co "COMPRESS=LZW" -co "BIGTIFF=IF_SAFER" {filename} {tmp_filename}'
+    if quiet_flag == True:
+        compress_command = compress_command.replace('gdal_translate','gdal_translate -q')
+    move_command = f'mv {tmp_filename} {filename}'
+    subprocess.run(compress_command,shell=True)
+    subprocess.run(move_command,shell=True)
+    return None
 
 def main():
     t_start = datetime.datetime.now()
@@ -462,6 +478,8 @@ def main():
     andwi_coastline_shp_file = polygonize_tif(andwi_coastline_tif_file)
     write_code = write_new_array_geotiff(src_andwi,surface_water_data,andwi_surface_water_tif_file,gdalconst.GDT_Byte)
     andwi_surface_water_shp_file = polygonize_tif(andwi_surface_water_tif_file)
+    compress_raster(andwi_coastline_tif_file,nodata=0,quiet_flag=True)
+    compress_raster(andwi_surface_water_tif_file,nodata=0,quiet_flag=True)
     '''
     Add code to simplify to ~10 m or 20 m
     '''
