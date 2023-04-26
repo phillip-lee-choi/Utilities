@@ -539,8 +539,11 @@ def main():
 
     file_list = sorted(glob.glob(f'{tmp_dir}{loc_name}_*_Filtered_NDVI_NDWI.txt'))
     output_full_file = input_file.replace('.txt','_Filtered_NDVI_NDWI.txt')
+    orig_header = ','.join(df_icesat2.columns.to_list())
     cat_command = f'cat {" ".join(file_list)} > {output_full_file}'
+    sed_command = f"sed -i '1i {orig_header}' {output_full_file}"
     subprocess.run(cat_command,shell=True)
+    subprocess.run(sed_command,shell=True)
     ndvi_ndwi_dir = f'{os.path.dirname(input_file)}/NDVI_NDWI/'
     if not os.path.isdir(ndvi_ndwi_dir):
         os.mkdir(ndvi_ndwi_dir)
