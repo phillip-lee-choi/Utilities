@@ -194,7 +194,7 @@ def apply_cloud_shadow_mask(s2_image):
 def csv_to_convex_hull_shp(df,csv_file,writing=True):
     lon = np.asarray(df.lon)
     lat = np.asarray(df.lat)
-    df['day'] = df['time'].str[:10]
+    df['day'] = [t[:10] for t in df.time]
     day_list = df.day.unique().tolist()
     day_list_cleaned = [x for x in day_list if str(x) != 'nan']
     idx = [list(df.day).index(x) for x in set(list(df.day))]
@@ -455,20 +455,15 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
     ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
     gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
     lon_ndvi_ndwi,lat_ndvi_ndwi = get_lonlat_gdf(gdf_ndvi_ndwi_threshold)
-    df_subset_day = pd.read_csv(subset_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
+    df_subset_day = pd.read_csv(subset_file)
     lon_subset_day = np.asarray(df_subset_day.lon)
     lat_subset_day = np.asarray(df_subset_day.lat)
-    height_subset_day = np.asarray(df_subset_day.height)
-    time_subset_day = np.asarray(df_subset_day.time)
 
     landmask = landmask_csv(lon_subset_day,lat_subset_day,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
-    lon_masked = lon_subset_day[landmask]
-    lat_masked = lat_subset_day[landmask]
-    height_masked = height_subset_day[landmask]
-    time_masked = time_subset_day[landmask]
+    df_subset_day_masked = df_subset_day[landmask].reset_index(drop=True)
 
     output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
-    np.savetxt(output_file,np.c_[lon_masked,lat_masked,height_masked,time_masked.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
+    df_subset_day_masked.to_csv(output_file,index=False,float_format='%.6f')
     t_end = datetime.datetime.now()
     dt = t_end - t_start
     print(f'Applying filter for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
@@ -519,15 +514,15 @@ def main():
                 'landmask_c_file':landmask_c_file,'tmp_dir':tmp_dir
                 }
 
-    df = pd.read_csv(input_file,header=None,names=['lon','lat','height','time'],dtype={'lon':'float','lat':'float','height':'float','time':'str'})
-    df['day'] = [t[:10] for t in df.time]
-    gdf_conv_hull = csv_to_convex_hull_shp(df,input_file)
+    df_icesat2 = pd.read_csv(input_file)
+    days = np.asarray([t[:10] for t in df_icesat2.time])
+    gdf_conv_hull = csv_to_convex_hull_shp(df_icesat2.copy(),input_file)
 
     loc_name = input_file.split('/')[-1].split('_ATL03')[0]
     gdf_conv_hull['loc_name'] = loc_name
 
     for day in gdf_conv_hull.day:
-        df[df.day == day].to_csv(f'{tmp_dir}{loc_name}_{day.replace("-","")}_ATL03.txt',index=False,header=False,columns=['lon','lat','height','time'])
+        df_icesat2[days == day].to_csv(f'{tmp_dir}{loc_name}_{day.replace("-","")}_ATL03.txt',index=False,float_format='%.6f')
 
     index_array = gdf_conv_hull.index.to_numpy(dtype=int)
     day_array = np.asarray(gdf_conv_hull.day)
