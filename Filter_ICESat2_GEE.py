@@ -463,7 +463,7 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
     df_subset_day_masked = df_subset_day[landmask].reset_index(drop=True)
 
     output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
-    df_subset_day_masked.to_csv(output_file,index=False,float_format='%.6f')
+    df_subset_day_masked.to_csv(output_file,index=False,float_format='%.6f',header=None) #in this case header=None prevents multiple headers in full output file
     t_end = datetime.datetime.now()
     dt = t_end - t_start
     print(f'Applying filter for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
