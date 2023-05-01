@@ -8,17 +8,24 @@ from osgeo import gdal,gdalconst,osr
 
 
 
-def sample_raster(raster_path, csv_path, output_file,nodata='-9999'):
-    cat_command = f"cat {csv_path} | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -wgs84 {raster_path} > tmp.txt"
-    subprocess.run(cat_command,shell=True)
-    fill_nan_command = f"awk '!NF{{$0=\"NaN\"}}1' tmp.txt > tmp2.txt"
-    subprocess.run(fill_nan_command,shell=True)
-    paste_command = f"paste -d , {csv_path} tmp2.txt > {output_file}"
-    subprocess.run(paste_command,shell=True)
-    subprocess.run(f"sed -i '/{nodata}/d' {output_file}",shell=True)
-    subprocess.run(f"sed -i '/NaN/d' {output_file}",shell=True)
-    subprocess.run(f"sed -i '/nan/d' {output_file}",shell=True)
-    subprocess.run(f"rm tmp.txt tmp2.txt",shell=True)
+def sample_raster(raster_path, csv_path, output_file,nodata='-9999',header=None,proj='wgs84'):
+    output_dir = os.path.dirname(output_file)
+    raster_base = os.path.splitext(raster_path.split('/')[-1])[0]
+    if header is not None:
+        cat_command = f"tail -n+2 {csv_path} | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -{proj} {raster_path} > tmp_{raster_base}.txt"
+    else:
+        cat_command = f"cat {csv_path} | cut -d, -f1-2 | sed 's/,/ /g' | gdallocationinfo -valonly -{proj} {raster_path} > tmp_{raster_base}.txt"
+    subprocess.run(cat_command,shell=True,cwd=output_dir)
+    fill_nan_command = f"awk '!NF{{$0=\"NaN\"}}1' tmp_{raster_base}.txt > tmp2_{raster_base}.txt"
+    subprocess.run(fill_nan_command,shell=True,cwd=output_dir)
+    if header is not None:
+        subprocess.run(f"sed -i '1i {header}' tmp2_{raster_base}.txt",shell=True,cwd=output_dir)
+    paste_command = f"paste -d , {csv_path} tmp2_{raster_base}.txt > {output_file}"
+    subprocess.run(paste_command,shell=True,cwd=output_dir)
+    subprocess.run(f"sed -i '/{nodata}/d' {output_file}",shell=True,cwd=output_dir)
+    subprocess.run(f"sed -i '/NaN/d' {output_file}",shell=True,cwd=output_dir)
+    subprocess.run(f"sed -i '/nan/d' {output_file}",shell=True,cwd=output_dir)
+    subprocess.run(f"rm tmp_{raster_base}.txt tmp2_{raster_base}.txt",shell=True,cwd=output_dir)
     return None
 
 def filter_outliers(dh,mean_median_mode='mean',n_sigma_filter=2):
@@ -32,56 +39,90 @@ def filter_outliers(dh,mean_median_mode='mean',n_sigma_filter=2):
     dh_filter = np.abs(dh-dh_mean_filter) < n_sigma_filter*dh_std
     return dh_filter
 
-def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.05):
+def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,printing=False,primary='h_primary',secondary='h_secondary'):
+    df_sampled = df_sampled.rename(columns={primary:'h_primary',secondary:'h_secondary'})
     count = 0
     cumulative_shift = 0
     original_len = len(df_sampled)
-    height_icesat2_original = np.asarray(df_sampled.height_icesat2)
-    height_dem_original = np.asarray(df_sampled.height_dem)
-    dh_original = height_icesat2_original - height_dem_original
+    h_primary_original = np.asarray(df_sampled.h_primary)
+    h_secondary_original = np.asarray(df_sampled.h_secondary)
+    dh_original = h_primary_original - h_secondary_original
     rmse_original = np.sqrt(np.sum(dh_original**2)/len(dh_original))
     while True:
         count = count + 1
-        height_icesat2 = np.asarray(df_sampled.height_icesat2)
-        height_dem = np.asarray(df_sampled.height_dem)
-        dh = height_icesat2 - height_dem
+        h_primary = np.asarray(df_sampled.h_primary)
+        h_secondary = np.asarray(df_sampled.h_secondary)
+        dh = h_primary - h_secondary
         dh_filter = filter_outliers(dh,mean_median_mode,n_sigma_filter)
         if mean_median_mode == 'mean':
             incremental_shift = np.mean(dh[dh_filter])
         elif mean_median_mode == 'median':
             incremental_shift = np.median(dh[dh_filter])
         df_sampled = df_sampled[dh_filter].reset_index(drop=True)
-        df_sampled.height_dem = df_sampled.height_dem + incremental_shift
+        df_sampled.h_secondary = df_sampled.h_secondary + incremental_shift
         cumulative_shift = cumulative_shift + incremental_shift
-        print(f'Iteration        : {count}')
-        print(f'Incremental shift: {incremental_shift:.2f} m\n')
+        if printing == True:
+            print(f'Iteration        : {count}')
+            print(f'Incremental shift: {incremental_shift:.2f} m\n')
         if np.abs(incremental_shift) <= vertical_shift_iterative_threshold:
             break
         if count == 15:
             break
-    height_icesat2_filtered = np.asarray(df_sampled.height_icesat2)
-    height_dem_filtered = np.asarray(df_sampled.height_dem)
-    dh_filtered = height_icesat2_filtered - height_dem_filtered
+    h_primary_filtered = np.asarray(df_sampled.h_primary)
+    h_secondary_filtered = np.asarray(df_sampled.h_secondary)
+    dh_filtered = h_primary_filtered - h_secondary_filtered
     rmse_filtered = np.sqrt(np.sum(dh_filtered**2)/len(dh_filtered))
-    print(f'Number of iterations: {count}')
-    print(f'Number of points before filtering: {original_len}')
-    print(f'Number of points after filtering: {len(df_sampled)}')
-    print(f'Retained {len(df_sampled)/original_len*100:.1f}% of points.')
-    print(f'Cumulative shift: {cumulative_shift:.2f} m')
-    print(f'RMSE before filtering: {rmse_original:.2f} m')
-    print(f'RMSE after filtering: {rmse_filtered:.2f} m')
-    return df_sampled,cumulative_shift
+    if printing == True:
+        print(f'Number of iterations: {count}')
+        print(f'Number of points before filtering: {original_len}')
+        print(f'Number of points after filtering: {len(df_sampled)}')
+        print(f'Retained {len(df_sampled)/original_len*100:.1f}% of points.')
+        print(f'Cumulative shift: {cumulative_shift:.2f} m')
+        print(f'RMSE before filtering: {rmse_original:.2f} m')
+        print(f'RMSE after filtering: {rmse_filtered:.2f} m')
+    return cumulative_shift,df_sampled
 
-
-def vertical_shift_raster(raster_path,df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.05):
+def vertical_shift_raster(raster_path,df_sampled,output_dir,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,primary='h_primary',secondary='h_secondary',return_df=False):
     src = gdal.Open(raster_path,gdalconst.GA_ReadOnly)
     raster_nodata = src.GetRasterBand(1).GetNoDataValue()
-    df_sampled_filtered,vertical_shift = calculate_shift(df_sampled,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold)
-    raster_base,raster_ext = os.path.splitext(raster_path)
-    raster_shifted = f'{raster_base}_shifted_{"{:.2f}".format(vertical_shift).replace(".","p").replace("-","neg")}m{raster_ext}'
+    vertical_shift,df_new = calculate_shift(df_sampled,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary=primary,secondary=secondary)
+    raster_base,raster_ext = os.path.splitext(raster_path.split('/')[-1])
+    if 'Shifted' in raster_base:
+        if 'Shifted_x' in raster_base:
+            if '_z_' in raster_base:
+                #case: input is Shifted_x_0.00m_y_0.00m_z_0.00m*.tif
+                original_shift = float(raster_base.split('Shifted')[1].split('_z_')[1].split('_')[0].replace('p','.').replace('neg','-').replace('m',''))
+                original_shift_str = f'{original_shift}'.replace(".","p").replace("-","neg")
+                new_shift = original_shift + vertical_shift
+                new_shift_str = f'{new_shift:.2f}'.replace('.','p').replace('-','neg')
+                raster_shifted = f'{output_dir}{raster_base}{raster_ext}'.replace(original_shift_str,new_shift_str)
+            else:
+                #case: input is Shifted_x_0.00m_y_0.00m*.tif
+                vertical_shift_str = f'{vertical_shift:.2f}'.replace('.','p').replace('-','neg')
+                post_string_fill = "_".join(raster_base.split("_y_")[1].split("_")[1:])
+                if len(post_string_fill) == 0:
+                    raster_shifted = f'{output_dir}{raster_base}{raster_ext}'.replace(raster_ext,f'_z_{vertical_shift_str}m{raster_ext}')
+                else:
+                    raster_shifted = f'{output_dir}{raster_base.split(post_string_fill)[0]}z_{vertical_shift_str}m_{post_string_fill}{raster_ext}'
+        elif 'Shifted_z' in raster_base:
+            #case: input is Shifted_z_0.00m*.tif
+            original_shift = float(raster_base.split('Shifted')[1].split('_z_')[1].split('_')[0].replace('p','.').replace('neg','-').replace('m',''))
+            new_shift = original_shift + vertical_shift
+            raster_shifted = f'{output_dir}{raster_base.split("Shifted")[0]}Shifted_z_{"{:.2f}".format(new_shift).replace(".","p").replace("-","neg")}m{raster_ext}'
+    else:
+        #case: input is *.tif
+        raster_shifted = f'{output_dir}{raster_base}_Shifted_z_{"{:.2f}".format(vertical_shift).replace(".","p").replace("-","neg")}m{raster_ext}'
     shift_command = f'gdal_calc.py --quiet -A {raster_path} --outfile={raster_shifted} --calc="A+{vertical_shift:.2f}" --NoDataValue={raster_nodata} --co "COMPRESS=LZW" --co "BIGTIFF=IF_SAFER" --co "TILED=YES"'
     subprocess.run(shift_command,shell=True)
-    return df_sampled_filtered,raster_shifted
+    rmse = np.sqrt(np.sum((df_new.h_primary-df_new.h_secondary)**2)/len(df_new))
+    ratio_pts = len(df_new)/len(df_sampled)
+    # print(f'Retained {len(df_new)/len(df_sampled)*100:.1f}% of points.')
+    # print(f'Vertical shift: {vertical_shift:.2f} m')
+    # print(f'RMSE: {rmse:.2f} m')
+    if return_df == True:
+        return raster_shifted,vertical_shift,rmse,ratio_pts,df_new
+    else:
+        return raster_shifted,vertical_shift,rmse,ratio_pts,None
 
 
 def main():
@@ -122,7 +163,7 @@ def main():
     sample_code = sample_raster(raster_path, csv_path, sampled_file,nodata=nodata_value)
     if sample_code is not None:
         print('Error in sampling raster.')
-    df_sampled_original = pd.read_csv(sampled_file,header=None,names=['lon','lat','height_icesat2','time','height_dem'],dtype={'lon':'float','lat':'float','height_icesat2':'float','time':'str','height_dem':'float'})
+    df_sampled_original = pd.read_csv(sampled_file)
     df_sampled_filtered,raster_shifted = vertical_shift_raster(raster_path,df_sampled_original,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold)
     if no_writing_flag == False:
         lon_filtered = np.asarray(df_sampled_filtered.lon)
