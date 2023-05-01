@@ -164,7 +164,7 @@ def main():
     if sample_code is not None:
         print('Error in sampling raster.')
     df_sampled_original = pd.read_csv(sampled_file)
-    df_sampled_filtered,raster_shifted = vertical_shift_raster(raster_path,df_sampled_original,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold)
+    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True)
     if no_writing_flag == False:
         lon_filtered = np.asarray(df_sampled_filtered.lon)
         lat_filtered = np.asarray(df_sampled_filtered.lat)
