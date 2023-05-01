@@ -120,6 +120,7 @@ def vertical_shift_raster(raster_path,df_sampled,output_dir,mean_median_mode='me
     # print(f'Vertical shift: {vertical_shift:.2f} m')
     # print(f'RMSE: {rmse:.2f} m')
     if return_df == True:
+        df_new.rename(columns={'h_primary':primary,'h_secondary':secondary},inplace=True)
         return raster_shifted,vertical_shift,rmse,ratio_pts,df_new
     else:
         return raster_shifted,vertical_shift,rmse,ratio_pts,None
@@ -157,21 +158,17 @@ def main():
     else:
         print('Please choose exactly one mode: mean or median.')
         sys.exit()
-    
 
-    sampled_file = f'{os.path.splitext(csv_path)[0]}_Sampled_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(csv_path)[1]}'
-    sample_code = sample_raster(raster_path, csv_path, sampled_file,nodata=nodata_value)
+    sampled_file = f'{os.path.dirname(raster_path)}/{os.path.basename(os.path.splitext(csv_path)[0])}_Sampled_{os.path.basename(os.path.splitext(raster_path)[0])}{os.path.splitext(csv_path)[1]}'
+    output_dir = f'{os.path.dirname(raster_path)}/'
+    sample_code = sample_raster(raster_path, csv_path, sampled_file,nodata=nodata_value,header='height_dsm')
     if sample_code is not None:
         print('Error in sampling raster.')
     df_sampled_original = pd.read_csv(sampled_file)
-    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True)
+    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True)
     if no_writing_flag == False:
-        lon_filtered = np.asarray(df_sampled_filtered.lon)
-        lat_filtered = np.asarray(df_sampled_filtered.lat)
-        height_icesat2_filtered = np.asarray(df_sampled_filtered.height_icesat2)
-        time_filtered = np.asarray(df_sampled_filtered.time)
         output_csv = f'{os.path.splitext(csv_path)[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
-        np.savetxt(output_csv,np.c_[lon_filtered,lat_filtered,height_icesat2_filtered,time_filtered.astype(object)],fmt='%f,%f,%f,%s',delimiter=',')
+        df_sampled_filtered.to_csv(output_csv,index=False,float_format='%.6f')
 
     if resample_flag == True:
         resampled_file = f'{os.path.splitext(output_csv)[0]}_Sampled_Coregistered_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(output_csv)[1]}'
