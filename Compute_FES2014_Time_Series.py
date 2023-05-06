@@ -10,13 +10,10 @@ import configparser
 import pandas as pd
 import geopandas as gpd
 import netCDF4 as nc
-import subprocess
 import ctypes as c
-import shapely
 import itertools
 import multiprocessing
 import numpy as np
-import sys
 
 import pyTMD.time
 import pyTMD.model
@@ -56,11 +53,6 @@ def compute_zmin_fes(z,n):
     '''
     z is not the same as zmajor!
     '''
-    # mu2 = [0.069439968323, 0.351535557706, -0.046278307672]
-    # nu2 = [-0.006104695053, 0.156878802427, 0.006755704028]
-    # l2 = [0.077137765667, -0.051653455134, 0.027869916824]
-    # t2 = [0.180480173707, -0.020101177502, 0.008331518844]
-    # lda2 = [0.016503557465, -0.013307812292, 0.007753383202]
     zmin = np.zeros((n,20),dtype=np.complex64)
     zmin[:,0] = 0.263*z[:,0] - 0.0252*z[:,1]#-- 2Q1
     zmin[:,1] = 0.297*z[:,0] - 0.0264*z[:,1]#-- sigma1
@@ -71,21 +63,7 @@ def compute_zmin_fes(z,n):
     zmin[:,6] = 0.0030*z[:,1] + 0.0171*z[:,3]#-- pi1
     zmin[:,7] = -0.0015*z[:,1] + 0.0152*z[:,3]#-- phi1
     zmin[:,8] = -0.0065*z[:,1] + 0.0155*z[:,3]#-- theta1
-    # zmin[:,9] = -0.0389*z[:,1] + 0.0836*z[:,3]#-- J1
     zmin[:,10] = -0.0431*z[:,1] + 0.0613*z[:,3]#-- OO1
-    # zmin[:,11] = 0.264*z[:,4] - 0.0253*z[:,5]#-- 2N2
-    # zmin[:,12] = 0.298*z[:,4] - 0.0264*z[:,5]#-- mu2
-    # zmin[:,13] = 0.165*z[:,4] + 0.00487*z[:,5]#-- nu2
-    # zmin[:,14] = 0.0040*z[:,5] + 0.0074*z[:,6]#-- lambda2
-    # zmin[:,15] = 0.0131*z[:,5] + 0.0326*z[:,6]#-- L2
-    # zmin[:,16] = 0.0033*z[:,5] + 0.0082*z[:,6]#-- L2
-    # zmin[:,17] = 0.0585*z[:,6]#-- t2
-    # zmin[:,12] = mu2[0]*z[:,7] + mu2[1]*z[:,4] + mu2[2]*z[:,5]#-- mu2
-    # zmin[:,13] = nu2[0]*z[:,7] + nu2[1]*z[:,4] + nu2[2]*z[:,5]#-- nu2
-    # zmin[:,14] = lda2[0]*z[:,7] + lda2[1]*z[:,4] + lda2[2]*z[:,5]#-- lambda2
-    # zmin[:,16] = l2[0]*z[:,7] + l2[1]*z[:,4] + l2[2]*z[:,5]#-- L2
-    # zmin[:,17] = t2[0]*z[:,7] + t2[1]*z[:,4] + t2[2]*z[:,5]#-- t2
-    # zmin[:,18] = 0.53285*z[:,8] - 0.03304*z[:,4]#-- eps2
     zmin[:,19] = -0.0034925*z[:,5] + 0.0831707*z[:,7]#-- eta2
     return zmin
 
@@ -121,18 +99,6 @@ def compute_f_fes(n,sinn,cosn,II,Ra1):
     Independent of location!
     '''
     f = np.ones((n,20))
-    # f[:,0] = np.sqrt((1.0 + 0.189*cosn - 0.0058*cos2n)**2 + (0.189*sinn - 0.0058*sin2n)**2)#-- 2Q1
-    # f[:,1] = f[:,0]#-- sigma1
-    # f[:,2] = f[:,0]#-- rho1
-    # f[:,3] = np.sqrt((1.0 + 0.185*cosn)**2 + (0.185*sinn)**2)#-- M12
-    # f[:,4] = np.sqrt((1.0 + 0.201*cosn)**2 + (0.201*sinn)**2)#-- M11
-    # f[:,5] = np.sqrt((1.0 + 0.221*cosn)**2 + (0.221*sinn)**2)#-- chi1
-    # f[:,9] = np.sqrt((1.0 + 0.198*cosn)**2 + (0.198*sinn)**2)#-- J1
-    # f[:,10] = np.sqrt((1.0 + 0.640*cosn + 0.134*cos2n)**2 + (0.640*sinn + 0.134*sin2n)**2)#-- OO1
-    # f[:,11] = np.sqrt((1.0 - 0.0373*cosn)**2 + (0.0373*sinn)**2)#-- 2N2
-    # f[:,12] = f[:,11]#-- mu2
-    # f[:,13] = f[:,11]#-- nu2
-    # f[:,15] = f[:,11]#-- L2
     f[:,16] = np.sqrt((1.0 + 0.441*cosn)**2 + (0.441*sinn)**2)#-- L2
     f[:,0] = np.sin(II)*(np.cos(II/2.0)**2)/0.38 #-- 2Q1
     f[:,1] = f[:,0] #-- sigma1
@@ -156,18 +122,6 @@ def compute_u_fes(n,sinn,cosn,dtr,xi,nu,R):
     Independent of location!
     '''
     u = np.zeros((n,20))
-    # u[:,0] = np.arctan2(0.189*sinn - 0.0058*sin2n,1.0 + 0.189*cosn - 0.0058*sin2n)/dtr#-- 2Q1
-    # u[:,1] = u[:,0]#-- sigma1
-    # u[:,2] = u[:,0]#-- rho1
-    # u[:,3] = np.arctan2( 0.185*sinn, 1.0 + 0.185*cosn)/dtr#-- M12
-    # u[:,4] = np.arctan2(-0.201*sinn, 1.0 + 0.201*cosn)/dtr#-- M11
-    # u[:,5] = np.arctan2(-0.221*sinn, 1.0 + 0.221*cosn)/dtr#-- chi1
-    # u[:,9] = np.arctan2(-0.198*sinn, 1.0 + 0.198*cosn)/dtr#-- J1
-    # u[:,10] = np.arctan2(-0.640*sinn - 0.134*sin2n,1.0 + 0.640*cosn + 0.134*cos2n)/dtr#-- OO1
-    # u[:,11] = np.arctan2(-0.0373*sinn, 1.0 - 0.0373*cosn)/dtr#-- 2N2
-    # u[:,12] = u[:,11]#-- mu2
-    # u[:,13] = u[:,11]#-- nu2
-    # u[:,15] = u[:,11]#-- L2
     u[:,16] = np.arctan2(-0.441*sinn, 1.0 + 0.441*cosn)/dtr#-- L2
     u[:,0] = (2.0*xi - nu)/dtr #-- 2Q1
     u[:,1] = u[:,0] #-- sigma1
@@ -188,16 +142,8 @@ def compute_u_fes(n,sinn,cosn,dtr,xi,nu,R):
 
 def prep_minor_tide_inference(t,DELTAT):
     dtr = np.pi/180.0
-    # npts,nc = z_shape
     n = len(np.atleast_1d(t))
-    # n = nt if ((npts == 1) & (nt > 1)) else npts
     MJD = 48622.0 + t
-    # cindex = ['q1','o1','p1','k1','n2','m2','s2','k2','2n2']
-    # z = np.ma.zeros((n,9),dtype=np.complex64)
-    # nz = 9
-    # minor = ['2q1','sigma1','rho1','m12','m11','chi1','pi1','phi1','theta1',
-        # 'j1','oo1','2n2','mu2','nu2','lambda2','l2','l2','t2','eps2','eta2']
-    # minor_indices = [i for i,m in enumerate(minor) if m not in constituents]
     hour = (t % 1)*24.0
     t1 = 15.0*hour
     t2 = 30.0*hour
@@ -205,8 +151,6 @@ def prep_minor_tide_inference(t,DELTAT):
     S,H,P,omega,pp = calc_astrol_longitudes(MJD+DELTAT, ASTRO5=ASTRO5)
     sinn = np.sin(omega*dtr)
     cosn = np.cos(omega*dtr)
-    # sin2n = np.sin(2.0*omega*dtr)
-    # cos2n = np.cos(2.0*omega*dtr)
     II = np.arccos(0.913694997 - 0.035692561*np.cos(omega*dtr))
     at1 = np.arctan(1.01883*np.tan(omega*dtr/2.0))
     at2 = np.arctan(0.64412*np.tan(omega*dtr/2.0))
@@ -269,7 +213,6 @@ def compute_tides(lon,lat,utc_time,model_dir,N_cpus):
     lat = np.delete(lat,idx_no_data)
     ymd = np.asarray([t.date() for t in utc_time])
     delta_days = np.asarray([y.days for y in ymd-ymd[0]]) #working with integers is much faster than datetime objects
-    unique_delta_days,idx_delta_days = np.unique(delta_days,return_index=True)
     seconds = np.asarray([t.hour*3600 + t.minute*60 + t.second + t.microsecond/1000000 for t in utc_time])
     tide_time = np.asarray([pyTMD.time.convert_calendar_dates(y.year,y.month,y.day,second=s) for y,s in zip(ymd,seconds)])
     deltat = calc_delta_time(delta_file, tide_time)
@@ -281,10 +224,6 @@ def compute_tides(lon,lat,utc_time,model_dir,N_cpus):
     pf_sinth = (pf*np.sin(th)).transpose()
     hc_real = hc.data.real
     hc_imag = hc.data.imag
-    tide_min = np.zeros(len(lon))
-    tide_max = np.zeros(len(lon))
-    mhhw = np.zeros(len(lon))
-    mllw = np.zeros(len(lon))
     th_minor,f_minor = prep_minor_tide_inference(tide_time,deltat)
     Z_matrix = get_z_matrix()
     f_costh = f_minor * np.cos(th_minor)
