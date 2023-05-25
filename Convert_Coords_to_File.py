@@ -3,6 +3,7 @@ import numpy as np
 import sys
 import geopandas as gpd
 import shapely
+import warnings
 
 def coords_to_xy(coords,reverse_coords_flag=False):
     coords = np.asarray(coords)
@@ -48,6 +49,7 @@ def filter_xy(coords,reverse_coords_flag=False):
     
 
 def main():
+    warnings.simplefilter(action='ignore')
     parser = argparse.ArgumentParser()
     parser.add_argument('--coords',nargs='*',help='Coordinates (lon,lat)',default=None)
     parser.add_argument('--output_file',help='Output file',default='output.shp')
