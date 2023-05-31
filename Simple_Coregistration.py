@@ -171,8 +171,8 @@ def main():
         df_sampled_filtered.to_csv(output_csv,index=False,float_format='%.6f')
 
     if resample_flag == True:
-        resampled_file = f'{os.path.splitext(output_csv)[0]}_Sampled_Coregistered_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(output_csv)[1]}'
-        resample_code = sample_raster(raster_shifted, output_csv, resampled_file,nodata=nodata_value)
+        resampled_file = f'{os.path.splitext(csv_path)[0]}_Sampled_Coregistered_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(csv_path)[1]}'
+        resample_code = sample_raster(raster_shifted, csv_path, resampled_file,nodata=nodata_value,header='height_dsm')
         if resample_code is not None:
             print('Error in sampling co-registered raster.')
     if keep_original_sample_flag == False:
