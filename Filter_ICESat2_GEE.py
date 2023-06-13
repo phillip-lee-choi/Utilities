@@ -194,25 +194,24 @@ def apply_cloud_shadow_mask(s2_image):
 def csv_to_convex_hull_shp(df,csv_file,writing=True):
     lon = np.asarray(df.lon)
     lat = np.asarray(df.lat)
-    df['day'] = [t[:10] for t in df.time]
-    day_list = df.day.unique().tolist()
-    day_list_cleaned = [x for x in day_list if str(x) != 'nan']
-    idx = [list(df.day).index(x) for x in set(list(df.day))]
+    date_list = df.date.unique().tolist()
+    date_list_cleaned = [x for x in date_list if str(x) != 'nan']
+    idx = [list(df.date).index(x) for x in set(list(df.date))]
     idx_sorted = np.sort(idx)
     idx_sorted = np.append(idx_sorted,len(df))
     gdf = gpd.GeoDataFrame()
-    for i in range(len(day_list_cleaned)):
-        day_str = day_list_cleaned[i]
+    for i in range(len(date_list_cleaned)):
+        date_str = date_list_cleaned[i]
         lonlat = np.column_stack((lon[idx_sorted[i]:idx_sorted[i+1]],lat[idx_sorted[i]:idx_sorted[i+1]]))
         if len(lonlat) == 1:
-            icesat2_day_polygon = shapely.geometry.Point(lonlat)
+            icesat2_date_polygon = shapely.geometry.Point(lonlat)
         elif len(lonlat) == 2:
-            icesat2_day_polygon = shapely.geometry.LineString(lonlat)
+            icesat2_date_polygon = shapely.geometry.LineString(lonlat)
         else:
-            icesat2_day_polygon = shapely.geometry.Polygon(lonlat)
-        conv_hull = icesat2_day_polygon.convex_hull
+            icesat2_date_polygon = shapely.geometry.Polygon(lonlat)
+        conv_hull = icesat2_date_polygon.convex_hull
         conv_hull_buffered = conv_hull.buffer(5E-4)
-        df_tmp = pd.DataFrame({'day':[day_str]})
+        df_tmp = pd.DataFrame({'date':[date_str]})
         gdf_tmp = gpd.GeoDataFrame(df_tmp,geometry=[conv_hull_buffered],crs='EPSG:4326')
         gdf = gpd.GeoDataFrame(pd.concat([gdf,gdf_tmp],ignore_index=True))
     gdf = gdf.set_crs('EPSG:4326')
@@ -221,15 +220,15 @@ def csv_to_convex_hull_shp(df,csv_file,writing=True):
         gdf.to_file(output_file)
     return gdf
 
-def find_s2_image(day,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist):
-    csv_day_ee = ee.Date.parse('YYYY-MM-dd',day)
+def find_s2_image(date,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist):
+    csv_date_ee = ee.Date.parse('YYYY-MM-dd',date)
     csv_geometry = geometry
     csv_geometry_bounds = csv_geometry.bounds
     csv_geometry_xy = [[x,y] for x,y in zip(csv_geometry.exterior.xy[0],csv_geometry.exterior.xy[1])]
     polygon = ee.Geometry.Polygon(csv_geometry_xy)
-    i_date = datetime.datetime.strptime(day,'%Y-%m-%d') - datetime.timedelta(days=dt_search)
+    i_date = datetime.datetime.strptime(date,'%Y-%m-%d') - datetime.timedelta(days=dt_search)
     i_date = i_date.strftime('%Y-%m-%d')
-    f_date = datetime.datetime.strptime(day,'%Y-%m-%d') + datetime.timedelta(days=dt_search+1) #because f_date is exclusive
+    f_date = datetime.datetime.strptime(date,'%Y-%m-%d') + datetime.timedelta(days=dt_search+1) #because f_date is exclusive
     f_date = f_date.strftime('%Y-%m-%d')
     s2_date_region = s2.filterDate(i_date,f_date).filterBounds(polygon)
     s2_cloud_probability_date_region = s2_cloud_probability.filterDate(i_date,f_date).filterBounds(polygon)
@@ -249,22 +248,22 @@ def find_s2_image(day,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,bu
     ymd_length = ymd_dates.length().getInfo()
     if ymd_length == 0:
         return None,None,None
-    dt_s2_images = ee.Array(ymd_dates.map(lambda s : ee.Date(s).difference(csv_day_ee,'day')))
+    dt_s2_images = ee.Array(ymd_dates.map(lambda s : ee.Date(s).difference(csv_date_ee,'day')))
     s2_subset = (ymd_ee.map(lambda date : s2_merged_date_region.filterMetadata('system:index','contains', date)))
     overlap_ratio = ee.Array(s2_subset.map(lambda img : ee.ImageCollection(img).geometry().intersection(polygon).area().divide(polygon.area())))
-    filtered_clouds_single_day = s2_subset.map(lambda img : ee.ImageCollection(img).map(lambda img2 : img2.clip(polygon)))
-    filtered_clouds_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).map(lambda img2 : add_cloud_shadow_mask(img2,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)))
-    cloudmask_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').selfMask())
-    notcloudmask_single_day = filtered_clouds_single_day.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').neq(1).selfMask())
-    n_clouds = ee.Array(cloudmask_single_day.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
-    n_not_clouds = ee.Array(notcloudmask_single_day.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
+    filtered_clouds_single_date = s2_subset.map(lambda img : ee.ImageCollection(img).map(lambda img2 : img2.clip(polygon)))
+    filtered_clouds_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).map(lambda img2 : add_cloud_shadow_mask(img2,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)))
+    cloudmask_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').selfMask())
+    notcloudmask_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').neq(1).selfMask())
+    n_clouds = ee.Array(cloudmask_single_date.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
+    n_not_clouds = ee.Array(notcloudmask_single_date.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
     cloud_percentage = n_clouds.divide(n_clouds.add(n_not_clouds))
     f1_score = (cloud_percentage.multiply(ee.Number(-1)).add(ee.Number(1))).multiply(overlap_ratio).divide((cloud_percentage.multiply(ee.Number(-1)).add(ee.Number(1))).add(overlap_ratio)).multiply(ee.Number(2))
     f1_modified = f1_score.subtract(dt_s2_images.abs().divide(ee.Number(100))).subtract(dt_s2_images.gt(ee.Number(0)).divide(ee.Number(200)))
     idx_select = f1_modified.argmax().get(0)
     ymd_select = ymd_ee.get(idx_select)
     ymd_select_info = ymd_select.getInfo()
-    s2_select = ee.ImageCollection(filtered_clouds_single_day.get(idx_select))
+    s2_select = ee.ImageCollection(filtered_clouds_single_date.get(idx_select))
     s2_select_clouds_removed = s2_select.map(lambda img : apply_cloud_shadow_mask(img))
     s2_select_clouds_removed_mosaic = s2_select_clouds_removed.mosaic()
     return s2_select_clouds_removed_mosaic,ymd_select_info,polygon
@@ -389,9 +388,9 @@ def download_img_google_drive(filename,output_folder,tmp_dir,token_json,credenti
             return 0
     return None
 
-def get_idx_subset_day(t_full,t_select):
-    t_day = np.asarray([t[:10] for t in t_full])
-    idx = t_day == t_select
+def get_idx_subset_date(t_full,t_select):
+    t_date = np.asarray([t[:10] for t in t_full])
+    idx = t_date == t_select
     return idx
 
 def polygonize_tif(img):
@@ -403,7 +402,7 @@ def polygonize_tif(img):
     subprocess.run(polygonize_command,shell=True)
     return shp
 
-def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
+def parallel_s2_image(idx,date,geometry,loc_name,subset_file,gee_dict):
     t_start = datetime.datetime.now()
     print(f'Working on {idx}...')
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
@@ -430,8 +429,8 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
     token_json = gee_dict['token_json']
     credentials_json = gee_dict['credentials_json']
 
-    i2_ymd = day.replace('-','')
-    s2_image,s2_ymd,s2_geometry = find_s2_image(day,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)
+    i2_ymd = date.replace('-','')
+    s2_image,s2_ymd,s2_geometry = find_s2_image(date,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)
     if s2_image is None:
         print(f'No suitable Sentinel-2 data for {idx}.')
         return 0
@@ -455,15 +454,15 @@ def parallel_s2_image(idx,day,geometry,loc_name,subset_file,gee_dict):
     ndvi_ndwi_threshold_shp = polygonize_tif(ndvi_ndwi_threshold_local_file)
     gdf_ndvi_ndwi_threshold = gpd.read_file(ndvi_ndwi_threshold_shp)
     lon_ndvi_ndwi,lat_ndvi_ndwi = get_lonlat_gdf(gdf_ndvi_ndwi_threshold)
-    df_subset_day = pd.read_csv(subset_file)
-    lon_subset_day = np.asarray(df_subset_day.lon)
-    lat_subset_day = np.asarray(df_subset_day.lat)
+    df_subset_date = pd.read_csv(subset_file)
+    lon_subset_date = np.asarray(df_subset_date.lon)
+    lat_subset_date = np.asarray(df_subset_date.lat)
 
-    landmask = landmask_csv(lon_subset_day,lat_subset_day,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
-    df_subset_day_masked = df_subset_day[landmask].reset_index(drop=True)
+    landmask = landmask_csv(lon_subset_date,lat_subset_date,lon_ndvi_ndwi,lat_ndvi_ndwi,landmask_c_file,1)
+    df_subset_date_masked = df_subset_date[landmask].reset_index(drop=True)
 
     output_file = f'{tmp_dir}{loc_name}_{i2_ymd}_Filtered_NDVI_NDWI.txt'
-    df_subset_day_masked.to_csv(output_file,index=False,float_format='%.6f',header=None) #in this case header=None prevents multiple headers in full output file
+    df_subset_date_masked.to_csv(output_file,index=False,float_format='%.6f',header=None) #in this case header=None prevents multiple headers in full output file
     t_end = datetime.datetime.now()
     dt = t_end - t_start
     print(f'Applying filter for {idx} took {dt.seconds + dt.microseconds/1e6:.1f} s.')
@@ -515,17 +514,17 @@ def main():
                 }
 
     df_icesat2 = pd.read_csv(input_file)
-    days = np.asarray([t[:10] for t in df_icesat2.time])
+    df_icesat2['date'] = np.asarray([t[:10] for t in df_icesat2.time])
     gdf_conv_hull = csv_to_convex_hull_shp(df_icesat2.copy(),input_file)
 
     loc_name = input_file.split('/')[-1].split('_ATL03')[0]
     gdf_conv_hull['loc_name'] = loc_name
 
-    for day in gdf_conv_hull.day:
-        df_icesat2[days == day].to_csv(f'{tmp_dir}{loc_name}_{day.replace("-","")}_ATL03.txt',index=False,float_format='%.6f')
+    for date in gdf_conv_hull.date:
+        df_icesat2[df_icesat2['date'] == date].to_csv(f'{tmp_dir}{loc_name}_{date.replace("-","")}_ATL03.txt',index=False,float_format='%.6f')
 
     index_array = gdf_conv_hull.index.to_numpy(dtype=int)
-    day_array = np.asarray(gdf_conv_hull.day)
+    date_array = np.asarray(gdf_conv_hull.date)
     geometry_array = np.asarray(gdf_conv_hull.geometry)
     loc_name_array = np.asarray(gdf_conv_hull.loc_name)
     subset_file_array = np.asarray(sorted(glob.glob(f'{tmp_dir}{loc_name}*_ATL03.txt')))
@@ -534,7 +533,7 @@ def main():
     ir = itertools.repeat
 
     p = multiprocessing.Pool(N_cpus)
-    p.starmap(parallel_s2_image,zip(index_array,day_array,geometry_array,loc_name_array,subset_file_array,ir(gee_dict)))
+    p.starmap(parallel_s2_image,zip(index_array,date_array,geometry_array,loc_name_array,subset_file_array,ir(gee_dict)))
     p.close()
 
     file_list = sorted(glob.glob(f'{tmp_dir}{loc_name}_*_Filtered_NDVI_NDWI.txt'))
