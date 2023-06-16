@@ -321,6 +321,8 @@ def main():
         lat_input_nearest = np.zeros(N_coords)
         for i in range(N_coords):
             dist = great_circle_distance(lon_input[i],lat_input[i],lon_array,lat_array)
+            idx_nan = np.isnan(dist)
+            dist[idx_nan] = np.inf
             idx = np.argmin(dist)
             min_dist = dist[idx]
             lon_input_nearest[i] = lon_array[idx]
