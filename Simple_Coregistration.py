@@ -82,10 +82,10 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
         print(f'RMSE after filtering: {rmse_filtered:.2f} m')
     return cumulative_shift,df_sampled
 
-def vertical_shift_raster(raster_path,df_sampled,output_dir,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,primary='h_primary',secondary='h_secondary',return_df=False):
+def vertical_shift_raster(raster_path,df_sampled,output_dir,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,primary='h_primary',secondary='h_secondary',return_df=False,printing=False):
     src = gdal.Open(raster_path,gdalconst.GA_ReadOnly)
     raster_nodata = src.GetRasterBand(1).GetNoDataValue()
-    vertical_shift,df_new = calculate_shift(df_sampled,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary=primary,secondary=secondary)
+    vertical_shift,df_new = calculate_shift(df_sampled,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary=primary,secondary=secondary,printing=printing)
     raster_base,raster_ext = os.path.splitext(raster_path.split('/')[-1])
     if 'Shifted' in raster_base:
         if 'Shifted_x' in raster_base:
@@ -138,6 +138,7 @@ def main():
     parser.add_argument('--keep_original_sample',default=False,action='store_true')
     parser.add_argument('--no_writing',default=False,action='store_true')
     parser.add_argument('--nodata', nargs='?', type=str,default='-9999')
+    parser.add_argument('--print',default=False,action='store_true')
 
     args = parser.parse_args()
     raster_path = args.raster
@@ -150,6 +151,7 @@ def main():
     keep_original_sample_flag = args.keep_original_sample
     no_writing_flag = args.no_writing
     nodata_value = args.nodata
+    print_flag = args.print
     if np.logical_xor(mean_mode,median_mode) == True:
         if mean_mode == True:
             mean_median_mode = 'mean'
@@ -165,7 +167,7 @@ def main():
     if sample_code is not None:
         print('Error in sampling raster.')
     df_sampled_original = pd.read_csv(sampled_file)
-    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True)
+    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True,printing=print_flag)
     if no_writing_flag == False:
         output_csv = f'{os.path.splitext(csv_path)[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
         df_sampled_filtered.to_csv(output_csv,index=False,float_format='%.6f')
