@@ -408,9 +408,6 @@ def parallel_s2_image(idx,date,geometry,loc_name,subset_file,gee_dict):
     s2 = ee.ImageCollection('COPERNICUS/S2_SR')
     s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
 
-    # config_file = 'utils_config.ini'
-    # config = configparser.ConfigParser()
-    # config.read(config_file)
     tmp_dir = gee_dict['tmp_dir']
     output_folder_gdrive = f'GEE_{loc_name}'
     landmask_c_file = gee_dict['landmask_c_file']
@@ -421,7 +418,6 @@ def parallel_s2_image(idx,date,geometry,loc_name,subset_file,gee_dict):
     nir_drk_thresh = gee_dict['NIR_DRK_THRESH']
     cld_prj_dist = gee_dict['CLD_PRJ_DIST']
     buffer = gee_dict['BUFFER']
-    # OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
     sr_band_scale = gee_dict['SR_BAND_SCALE']
     ndvi_threshold = gee_dict['NDVI_THRESHOLD']
     ndwi_threshold = gee_dict['NDWI_THRESHOLD']
@@ -496,7 +492,6 @@ def main():
     NIR_DRK_THRESH = config.getfloat('GEE_CONSTANTS','NIR_DRK_THRESH')
     CLD_PRJ_DIST = config.getint('GEE_CONSTANTS','CLD_PRJ_DIST')
     BUFFER = config.getint('GEE_CONSTANTS','BUFFER')
-    OVERLAP_MINIMUM = config.getfloat('GEE_CONSTANTS','OVERLAP_MINIMUM')
     SR_BAND_SCALE = config.getfloat('GEE_CONSTANTS','SR_BAND_SCALE')
     NDVI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDVI_THRESHOLD')
     NDWI_THRESHOLD = config.getfloat('GEE_CONSTANTS','NDWI_THRESHOLD')
@@ -507,7 +502,7 @@ def main():
 
     gee_dict = {'DT_SEARCH':DT_SEARCH,'CLOUD_FILTER':CLOUD_FILTER,'CLD_PRB_THRESH':CLD_PRB_THRESH,
                 'NIR_DRK_THRESH':NIR_DRK_THRESH,'CLD_PRJ_DIST':CLD_PRJ_DIST,'BUFFER':BUFFER,
-                'OVERLAP_MINIMUM':OVERLAP_MINIMUM,'SR_BAND_SCALE':SR_BAND_SCALE,
+                'SR_BAND_SCALE':SR_BAND_SCALE,
                 'NDVI_THRESHOLD':NDVI_THRESHOLD,'NDWI_THRESHOLD':NDWI_THRESHOLD,
                 'SCOPES':SCOPES,'token_json':token_json,'credentials_json':credentials_json,
                 'landmask_c_file':landmask_c_file,'tmp_dir':tmp_dir
