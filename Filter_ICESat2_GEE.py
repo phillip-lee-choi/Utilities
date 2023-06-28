@@ -473,12 +473,12 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file',help='Path to csv to filter')
-    parser.add_argument('--cpus',help='Number of cpus to use',default=1)
     parser.add_argument('--machine',help='Machine name',default='t')
+    parser.add_argument('--N_cpus',help='Number of CPUs to use',default=1,type=int)
     args = parser.parse_args()
     input_file = args.input_file
-    N_cpus = int(args.cpus)
     machine_name = args.machine
+    N_cpus = args.N_cpus
 
     tmp_dir = config.get('GENERAL_PATHS','tmp_dir')
     if machine_name == 'b':
