@@ -49,7 +49,7 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
     dh_original = h_primary_original - h_secondary_original
     rmse_original = np.sqrt(np.sum(dh_original**2)/len(dh_original))
     if write_file is not None:
-        f = open(write_file,'wb')
+        f = open(write_file,'w')
     while True:
         count = count + 1
         h_primary = np.asarray(df_sampled.h_primary)
@@ -67,7 +67,7 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
             print(f'Iteration        : {count}')
             print(f'Incremental shift: {incremental_shift:.2f} m\n')
         if write_file is not None:
-            f.writelines(f'Iteration        : {count}')
+            f.writelines(f'Iteration        : {count}\n')
             f.writelines(f'Incremental shift: {incremental_shift:.2f} m\n')
         if np.abs(incremental_shift) <= vertical_shift_iterative_threshold:
             break
@@ -86,13 +86,13 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
         print(f'RMSE before filtering: {rmse_original:.2f} m')
         print(f'RMSE after filtering: {rmse_filtered:.2f} m')
     if write_file is not None:
-        f.writelines(f'Number of iterations: {count}')
-        f.writelines(f'Number of points before filtering: {original_len}')
-        f.writelines(f'Number of points after filtering: {len(df_sampled)}')
-        f.writelines(f'Retained {len(df_sampled)/original_len*100:.1f}% of points.')
-        f.writelines(f'Cumulative shift: {cumulative_shift:.2f} m')
-        f.writelines(f'RMSE before filtering: {rmse_original:.2f} m')
-        f.writelines(f'RMSE after filtering: {rmse_filtered:.2f} m')
+        f.writelines(f'Number of iterations: {count}\n')
+        f.writelines(f'Number of points before filtering: {original_len}\n')
+        f.writelines(f'Number of points after filtering: {len(df_sampled)}\n')
+        f.writelines(f'Retained {len(df_sampled)/original_len*100:.1f}% of points.\n')
+        f.writelines(f'Cumulative shift: {cumulative_shift:.2f} m\n')
+        f.writelines(f'RMSE before filtering: {rmse_original:.2f} m\n')
+        f.writelines(f'RMSE after filtering: {rmse_filtered:.2f} m\n')
         f.close()
     return cumulative_shift,df_sampled
 
