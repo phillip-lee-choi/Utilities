@@ -158,6 +158,7 @@ def main():
     parser.add_argument('--nodata', nargs='?', type=str,default='-9999')
     parser.add_argument('--print',default=False,action='store_true')
     parser.add_argument('--write_file',default=None)
+    parser.add_argument('--output_dir',default=None,help='Directory for output files.')
     parser.add_argument('--N_iterations',default=15,type=int,help='Number of iterations before breaking loop.')
 
     args = parser.parse_args()
@@ -173,6 +174,7 @@ def main():
     nodata_value = args.nodata
     print_flag = args.print
     write_file = args.write_file
+    output_dir = args.output_dir
     N_iterations = args.N_iterations
     if np.logical_xor(mean_mode,median_mode) == True:
         if mean_mode == True:
@@ -183,19 +185,26 @@ def main():
         print('Please choose exactly one mode: mean or median.')
         sys.exit()
 
-    sampled_file = f'{os.path.dirname(raster_path)}/{os.path.basename(os.path.splitext(csv_path)[0])}_Sampled_{os.path.basename(os.path.splitext(raster_path)[0])}{os.path.splitext(csv_path)[1]}'
-    output_dir = f'{os.path.dirname(raster_path)}/'
+    if output_dir is None:
+        output_dir = f'{os.path.dirname(raster_path)}/'
+    elif output_dir[-1] != '/':
+        output_dir = f'{output_dir}/'
+
+    if len(os.path.dirname(write_file)) == 0:
+        write_file = f'{output_dir}{write_file}'
+
+    sampled_file = f'{output_dir}{os.path.basename(os.path.splitext(csv_path)[0])}_Sampled_{os.path.basename(os.path.splitext(raster_path)[0])}{os.path.splitext(csv_path)[1]}'
     sample_code = sample_raster(raster_path, csv_path, sampled_file,nodata=nodata_value,header='height_dsm')
     if sample_code is not None:
         print('Error in sampling raster.')
     df_sampled_original = pd.read_csv(sampled_file)
     raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True,printing=print_flag,write_file=write_file,N_iterations=N_iterations)
     if no_writing_flag == False:
-        output_csv = f'{os.path.splitext(csv_path)[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
+        output_csv = f'{output_dir}{os.path.splitext(os.path.basename(csv_path))[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
         df_sampled_filtered.to_csv(output_csv,index=False,float_format='%.6f')
 
     if resample_flag == True:
-        resampled_file = f'{os.path.splitext(csv_path)[0]}_Sampled_Coregistered_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(csv_path)[1]}'
+        resampled_file = f'{output_dir}{os.path.splitext(os.path.basename(csv_path))[0]}_Sampled_Coregistered_{os.path.splitext(os.path.basename(raster_path))[0]}{os.path.splitext(csv_path)[1]}'
         resample_code = sample_raster(raster_shifted, csv_path, resampled_file,nodata=nodata_value,header='height_dsm')
         if resample_code is not None:
             print('Error in sampling co-registered raster.')
