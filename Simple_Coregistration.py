@@ -200,7 +200,7 @@ def main():
     df_sampled_original = pd.read_csv(sampled_file)
     raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True,printing=print_flag,write_file=write_file,N_iterations=N_iterations)
     if no_writing_flag == False:
-        output_csv = f'{output_dir}{os.path.splitext(os.path.basename(csv_path))[0]}_Filtered_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
+        output_csv = f'{output_dir}{os.path.splitext(os.path.basename(csv_path))[0]}_Filtered_{os.path.basename(os.path.splitext(raster_path)[0])}_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
         df_sampled_filtered.to_csv(output_csv,index=False,float_format='%.6f')
 
     if resample_flag == True:
