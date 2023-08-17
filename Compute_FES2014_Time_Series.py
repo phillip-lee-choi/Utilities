@@ -41,7 +41,9 @@ def great_circle_distance(lon1,lat1,lon2,lat2,R=6378137.0):
     lat2 = deg2rad(lat2)
     DL = np.abs(lon2 - lon1)
     DP = np.abs(lat2 - lat1)
-    dsigma = 2*np.arcsin( np.sqrt( np.sin(0.5*DP)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(0.5*DL)**2))
+    tmp = np.sqrt( np.sin(0.5*DP)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(0.5*DL)**2)
+    tmp[tmp>1] = 1
+    dsigma = 2*np.arcsin(tmp)
     distance = R*dsigma
     return distance
 
