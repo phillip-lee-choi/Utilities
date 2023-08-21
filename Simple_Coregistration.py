@@ -39,7 +39,7 @@ def filter_outliers(dh,mean_median_mode='mean',n_sigma_filter=2):
     dh_filter = np.abs(dh-dh_mean_filter) < n_sigma_filter*dh_std
     return dh_filter
 
-def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,printing=False,write_file=None,primary='h_primary',secondary='h_secondary',N_iterations=15):
+def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,printing=False,write_file=None,primary='h_primary',secondary='h_secondary',N_iterations=15,sigma_flag=False):
     df_sampled = df_sampled.rename(columns={primary:'h_primary',secondary:'h_secondary'})
     count = 0
     cumulative_shift = 0
@@ -81,6 +81,9 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
     h_secondary_filtered = np.asarray(df_sampled.h_secondary)
     dh_filtered = h_primary_filtered - h_secondary_filtered
     rmse_filtered = np.sqrt(np.sum(dh_filtered**2)/len(dh_filtered))
+    if sigma_flag == True:
+        sigma_i2 = np.sqrt(np.sum(df_sampled.sigma**2)/len(df_sampled))
+        sigma_dsm = np.sqrt(np.var(dh_filtered) - sigma_i2**2)
     if printing == True:
         print(f'Number of iterations: {count}')
         print(f'Number of points before filtering: {original_len}')
@@ -89,6 +92,8 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
         print(f'Cumulative shift: {cumulative_shift:.2f} m')
         print(f'RMSE before filtering: {rmse_original:.2f} m')
         print(f'RMSE after filtering: {rmse_filtered:.2f} m')
+        if sigma_flag == True:
+            print(f'DSM sigma: {sigma_dsm:.2f} m')
     if write_file is not None:
         f.writelines(f'Number of iterations: {count}\n')
         f.writelines(f'Number of points before filtering: {original_len}\n')
@@ -97,13 +102,15 @@ def calculate_shift(df_sampled,mean_median_mode='mean',n_sigma_filter=2,vertical
         f.writelines(f'Cumulative shift: {cumulative_shift:.2f} m\n')
         f.writelines(f'RMSE before filtering: {rmse_original:.2f} m\n')
         f.writelines(f'RMSE after filtering: {rmse_filtered:.2f} m\n')
+        if sigma_flag == True:
+            f.writelines(f'DSM sigma: {sigma_dsm:.2f} m\n')
         f.close()
     return cumulative_shift,df_sampled
 
-def vertical_shift_raster(raster_path,df_sampled,output_dir,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,primary='h_primary',secondary='h_secondary',return_df=False,printing=False,write_file=None,N_iterations=15):
+def vertical_shift_raster(raster_path,df_sampled,output_dir,mean_median_mode='mean',n_sigma_filter=2,vertical_shift_iterative_threshold=0.02,primary='h_primary',secondary='h_secondary',return_df=False,printing=False,write_file=None,N_iterations=15,sigma_flag=False):
     src = gdal.Open(raster_path,gdalconst.GA_ReadOnly)
     raster_nodata = src.GetRasterBand(1).GetNoDataValue()
-    vertical_shift,df_new = calculate_shift(df_sampled,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary=primary,secondary=secondary,printing=printing,write_file=write_file,N_iterations=N_iterations)
+    vertical_shift,df_new = calculate_shift(df_sampled,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary=primary,secondary=secondary,printing=printing,write_file=write_file,N_iterations=N_iterations,sigma_flag=sigma_flag)
     raster_base,raster_ext = os.path.splitext(raster_path.split('/')[-1])
     if 'Shifted' in raster_base:
         if 'Shifted_x' in raster_base:
@@ -193,12 +200,30 @@ def main():
     if len(os.path.dirname(write_file)) == 0:
         write_file = f'{output_dir}{write_file}'
 
+    '''
+    Read header line of csv, if it has "sigma" in it, read 
+    '''
+    csv_header_line = subprocess.check_output(f'head -n 1 {csv_path}',shell=True).decode('utf-8').strip()
+    if 'sigma' in csv_header_line.lower():
+        sigma_flag = True
+        df_csv = pd.read_csv(csv_path)
+        idx_sigma = df_csv.sigma != 0
+        if np.sum(idx_sigma) < len(df_csv):
+            df_csv = df_csv[idx_sigma].reset_index(drop=True)
+            new_csv_path = csv_path.replace(os.path.splitext(csv_path)[1],f'_nonzero_sigma{os.path.splitext(csv_path)[1]}')
+            df_csv.to_csv(new_csv_path,index=False,float_format='%.6f')
+            csv_path = new_csv_path
+    else:
+        sigma_flag = False
+
+
+
     sampled_file = f'{output_dir}{os.path.basename(os.path.splitext(csv_path)[0])}_Sampled_{os.path.basename(os.path.splitext(raster_path)[0])}{os.path.splitext(csv_path)[1]}'
     sample_code = sample_raster(raster_path, csv_path, sampled_file,nodata=nodata_value,header='height_dsm')
     if sample_code is not None:
         print('Error in sampling raster.')
     df_sampled_original = pd.read_csv(sampled_file)
-    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True,printing=print_flag,write_file=write_file,N_iterations=N_iterations)
+    raster_shifted,vertical_shift,rmse,ratio_pts,df_sampled_filtered = vertical_shift_raster(raster_path,df_sampled_original,output_dir,mean_median_mode,n_sigma_filter,vertical_shift_iterative_threshold,primary='height_icesat2',secondary='height_dsm',return_df=True,printing=print_flag,write_file=write_file,N_iterations=N_iterations,sigma_flag=sigma_flag)
     if no_writing_flag == False:
         output_csv = f'{output_dir}{os.path.splitext(os.path.basename(csv_path))[0]}_Filtered_{os.path.basename(os.path.splitext(raster_path)[0])}_{mean_median_mode}_{n_sigma_filter}sigma_Threshold_{str(vertical_shift_iterative_threshold).replace(".","p")}m{os.path.splitext(csv_path)[1]}'
         df_sampled_filtered.to_csv(output_csv,index=False,float_format='%.6f')
