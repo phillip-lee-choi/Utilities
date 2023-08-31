@@ -70,11 +70,10 @@ def main():
             src = gdal.Open(f,gdalconst.GA_ReadOnly)
             p = get_polygon_from_src(src)
             polygon_list.append(p)
-        gdf = gpd.GeoDataFrame(geometry=polygon_list,crs=f'EPSG:{epsg_code}')
+        gdf = gpd.GeoDataFrame(geometry=polygon_list,data={'file':file_list_epsg},crs=f'EPSG:{epsg_code}')
         if len(unique_epsg) == 1:
             gdf.to_file(output_file)
         else:
-            
             gdf.to_file(f'{os.path.splitext(output_file)[0]}_{epsg_code}{os.path.splitext(output_file)[1]}')
 
 if __name__ == '__main__':
