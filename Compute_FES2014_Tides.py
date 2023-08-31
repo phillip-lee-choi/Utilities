@@ -51,7 +51,7 @@ def main():
     parser.add_argument('--lat',help='Latitude')
     parser.add_argument('--t_start',help='Start time',default=datetime.datetime(datetime.datetime.now().year,1,1,0,0,0).strftime('%Y-%m-%d %H:%M:%S'))
     parser.add_argument('--t_end',help='End time',default=datetime.datetime(datetime.datetime.now().year,datetime.datetime.now().month,datetime.datetime.now().day,0,0,0).strftime('%Y-%m-%d %H:%M:%S'))
-    parser.add_argument('--resolution',help='Temporal resolution (mins).',default=5)
+    parser.add_argument('--t_resolution',help='Temporal resolution (mins).',default=5,type=float)
     parser.add_argument('--model_dir',help='Model directory',default=config['FES2014']['model_dir'])
     parser.add_argument('--output_file',help='Output file')
     parser.add_argument('--plot',help='Plot',action='store_true')
@@ -60,7 +60,7 @@ def main():
     lat = float(args.lat)
     t_start = datetime.datetime.strptime(args.t_start,'%Y-%m-%d %H:%M:%S')
     t_end = datetime.datetime.strptime(args.t_end,'%Y-%m-%d %H:%M:%S')
-    t_resolution = args.resolution
+    t_resolution = args.t_resolution
     model_dir = args.model_dir
     output_file = args.output_file
     plot_flag = args.plot
