@@ -197,7 +197,7 @@ def main():
     elif output_dir[-1] != '/':
         output_dir = f'{output_dir}/'
 
-    if len(os.path.dirname(write_file)) == 0:
+    if write_file is not None and len(os.path.dirname(write_file)) == 0:
         write_file = f'{output_dir}{write_file}'
 
     '''
