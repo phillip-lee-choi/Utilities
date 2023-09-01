@@ -1,6 +1,7 @@
 import geopandas as gpd
 import argparse
 import os
+import warnings
 
 def buffer_gdf(gdf,buffer):
     '''
@@ -13,6 +14,7 @@ def buffer_gdf(gdf,buffer):
     return gdf_buffered
 
 def main():
+    warnings.simplefilter(action='ignore')
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_file',help='Input file.',default=None)
     parser.add_argument('--buffer',help='Buffer distance (meters).',default=50,type=float)
