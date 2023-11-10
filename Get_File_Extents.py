@@ -32,21 +32,21 @@ def main():
     parser.add_argument('--output_file',help='Output file',default='output.shp')
     parser.add_argument('--smooth',help='Replace *dem.tif with *dem_smooth.tif',default=False,action='store_true')
     args = parser.parse_args()
-    dir = args.dir
+    input_dir = args.dir
     input_list = args.list
     output_file = args.output_file
     smooth_flag = args.smooth
 
 
-    if dir is None and input_list is None:
+    if input_dir is None and input_list is None:
         print('Either --dir or --list must be specified.')
         sys.exit()
-    elif dir is not None and input_list is not None:
+    elif input_dir is not None and input_list is not None:
         print('Only one of --dir or --list can be specified.')
         sys.exit()
     
-    if dir is not None:
-        file_list = sorted([f for f in glob.iglob(f'{dir}**/*dem.tif',recursive=True)])
+    if input_dir is not None:
+        file_list = sorted([f for f in glob.iglob(f'{input_dir}**/*dem.tif',recursive=True)])
     elif input_list is not None:
         if os.path.isfile(input_list) == False:
             print(f'File {input_list} does not exist.')
@@ -65,12 +65,13 @@ def main():
     for epsg_code in unique_epsg:
         idx_epsg = np.argwhere(epsg_list == epsg_code).squeeze()
         file_list_epsg = file_list[idx_epsg]
+        filename_list_epsg = [os.path.basename(f) for f in file_list_epsg]
         polygon_list = []
         for f in file_list_epsg:
             src = gdal.Open(f,gdalconst.GA_ReadOnly)
             p = get_polygon_from_src(src)
             polygon_list.append(p)
-        gdf = gpd.GeoDataFrame(geometry=polygon_list,data={'file':file_list_epsg},crs=f'EPSG:{epsg_code}')
+        gdf = gpd.GeoDataFrame(geometry=polygon_list,data={'file':filename_list_epsg},crs=f'EPSG:{epsg_code}')
         if len(unique_epsg) == 1:
             gdf.to_file(output_file)
         else:
