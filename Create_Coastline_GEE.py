@@ -366,7 +366,7 @@ def compress_raster(filename,nodata=-9999,quiet_flag=False):
 def main():
     t_start = datetime.datetime.now()
     ee.Initialize()
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
     s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
     #select (in order): Blue, Green, Red, NIR, Cloud Probability Map, Cloud mask
     print('Loaded Sentinel 2.')

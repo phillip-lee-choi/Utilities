@@ -405,7 +405,7 @@ def polygonize_tif(img):
 def parallel_s2_image(idx,date,geometry,loc_name,subset_file,gee_dict):
     t_start = datetime.datetime.now()
     print(f'Working on {idx}...')
-    s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+    s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
     s2_cloud_probability = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
 
     tmp_dir = gee_dict['tmp_dir']
