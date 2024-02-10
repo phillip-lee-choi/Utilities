@@ -98,11 +98,14 @@ def overpy_to_gdf(overpy_struc,unary_flag=True):
         lon_end = np.asarray([float(member.resolve().nodes[-1].lon) for member in relation.members if member.role == 'outer'])
         lat_end = np.asarray([float(member.resolve().nodes[-1].lat) for member in relation.members if member.role == 'outer'])
         idx_relations = np.asarray([m.ref for m in relation.members if m.role == 'outer'])
+        member_roles = np.asarray([m.role for m in relation.members])
+        idx_inner = np.atleast_1d(np.argwhere(member_roles=='inner').squeeze())
+        idx_outer = np.atleast_1d(np.argwhere(member_roles=='outer').squeeze())
         idx_sorted,idx_flipped = find_polygon_members(lon_start,lat_start,lon_end,lat_end,idx_relations)
         idx_searchsorted = np.argsort(idx_sorted)[np.searchsorted(idx_sorted[np.argsort(idx_sorted)],idx_relations)]
         lon_outer = np.empty([0,1],dtype=float)
         lat_outer = np.empty([0,1],dtype=float)
-        for i,idx, in enumerate(idx_searchsorted):
+        for i,idx in enumerate(idx_outer[idx_searchsorted]):
             lon = np.asarray([float(n.lon) for n in relation.members[idx].resolve().nodes])
             lat = np.asarray([float(n.lat) for n in relation.members[idx].resolve().nodes])
             if idx_flipped[i] == True:
@@ -141,8 +144,8 @@ def main():
     parser.add_argument('--extents',type=float,nargs=4,help='lon_min lon_max lat_min lat_max')
     parser.add_argument('--out_file',type=str,help='Output file name')
     parser.add_argument('--min_size',type=float,default=10000.0,help='Minimum polygon size (m^2)')
-    parser.add_argument('--unary_union',type='store_true',help='Perform unary union',default=False)
-    parser.add_argument('--inverse',type='store_true',help='Inverse selection',default=False)
+    parser.add_argument('--unary_union',action='store_true',help='Perform unary union',default=False)
+    parser.add_argument('--inverse',action='store_true',help='Inverse selection',default=False)
     args = parser.parse_args()
 
     lon_min,lon_max,lat_min,lat_max = args.extents
