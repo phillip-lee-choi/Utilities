@@ -167,9 +167,9 @@ def add_cloud_bands(s2_image,cld_prb_thresh):
     is_cloud = cloud_probability.gt(cld_prb_thresh).rename('clouds')
     return s2_image.addBands(ee.Image([cloud_probability, is_cloud]))
 
-def add_shadow_bands(s2_image,nir_drk_thresh,cld_prj_dist):
+def add_shadow_bands(s2_image,nir_drk_thresh,cld_prj_dist,sr_band_scale):
     not_water = s2_image.select('SCL').neq(6) 
-    sr_band_scale = 1e4
+    # sr_band_scale = 1e4
     dark_pixels = s2_image.select('B8').lt(nir_drk_thresh*sr_band_scale).multiply(not_water).rename('dark_pixels')
     shadow_azimuth = ee.Number(90).subtract(ee.Number(s2_image.get('MEAN_SOLAR_AZIMUTH_ANGLE')))
     cld_proj = (s2_image.select('clouds').directionalDistanceTransform(shadow_azimuth, cld_prj_dist*10)
@@ -180,9 +180,9 @@ def add_shadow_bands(s2_image,nir_drk_thresh,cld_prj_dist):
     shadows = cld_proj.multiply(dark_pixels).rename('shadows')
     return s2_image.addBands(ee.Image([dark_pixels, cld_proj, shadows]))
 
-def add_cloud_shadow_mask(s2_image,buffer_val,cld_prb_thresh,nir_drk_thresh,cld_prj_dist):
+def add_cloud_shadow_mask(s2_image,buffer_val,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist):
     img_cloud = add_cloud_bands(s2_image,cld_prb_thresh)
-    img_cloud_shadow = add_shadow_bands(img_cloud,nir_drk_thresh,cld_prj_dist)
+    img_cloud_shadow = add_shadow_bands(img_cloud,nir_drk_thresh,cld_prj_dist,sr_band_scale)
     #this works:
     is_cloud_shadow = img_cloud_shadow.select('clouds').add(img_cloud_shadow.select('shadows')).gt(0).rename('cloudmask')
     #this doesn't work:
