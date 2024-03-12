@@ -152,24 +152,27 @@ def get_NDVI_ANDWI_threshold(s2_image,NDVI_THRESHOLD,NDWI_THRESHOLD):
 def clip_to_geometry(s2_image,geometry):
     return s2_image.clip(geometry)
 
-def count_pixels(image,geometry):
+def count_pixels(image,polygon):
     reduced = image.reduceRegion(
         reducer=ee.Reducer.count(),
-        geometry=geometry,
+        geometry=polygon,
         scale=10,
-        maxPixels=1e13)
+        maxPixels=1e13,
+        bestEffort=True,
+        crs='EPSG:4326')
     return reduced
 
-def add_cloud_bands(s2_image,CLD_PRB_THRESH):
+def add_cloud_bands(s2_image,cld_prb_thresh):
     cloud_probability = ee.Image(s2_image.get('s2cloudless')).select('probability')
-    is_cloud = cloud_probability.gt(CLD_PRB_THRESH).rename('clouds')
+    is_cloud = cloud_probability.gt(cld_prb_thresh).rename('clouds')
     return s2_image.addBands(ee.Image([cloud_probability, is_cloud]))
 
-def add_shadow_bands(s2_image,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
+def add_shadow_bands(s2_image,nir_drk_thresh,cld_prj_dist):
     not_water = s2_image.select('SCL').neq(6) 
-    dark_pixels = s2_image.select('B8').lt(NIR_DRK_THRESH*SR_BAND_SCALE).multiply(not_water).rename('dark_pixels')
+    sr_band_scale = 1e4
+    dark_pixels = s2_image.select('B8').lt(nir_drk_thresh*sr_band_scale).multiply(not_water).rename('dark_pixels')
     shadow_azimuth = ee.Number(90).subtract(ee.Number(s2_image.get('MEAN_SOLAR_AZIMUTH_ANGLE')))
-    cld_proj = (s2_image.select('clouds').directionalDistanceTransform(shadow_azimuth, CLD_PRJ_DIST*10)
+    cld_proj = (s2_image.select('clouds').directionalDistanceTransform(shadow_azimuth, cld_prj_dist*10)
         .reproject(**{'crs': s2_image.select(0).projection(), 'scale': 100})
         .select('distance')
         .mask()
@@ -177,14 +180,16 @@ def add_shadow_bands(s2_image,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
     shadows = cld_proj.multiply(dark_pixels).rename('shadows')
     return s2_image.addBands(ee.Image([dark_pixels, cld_proj, shadows]))
 
-def add_cloud_shadow_mask(s2_image,BUFFER,CLD_PRB_THRESH,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST):
-    img_cloud = add_cloud_bands(s2_image,CLD_PRB_THRESH)
-    img_cloud_shadow = add_shadow_bands(img_cloud,NIR_DRK_THRESH,SR_BAND_SCALE,CLD_PRJ_DIST)
-    is_cloud_shadow = img_cloud_shadow.select('clouds').add(img_cloud_shadow.select('shadows')).gt(0)
-    is_cloud_shadow = (is_cloud_shadow.focal_min(2).focal_max(BUFFER*2/20)
-        .reproject(**{'crs': s2_image.select([0]).projection(), 'scale': 20})
-        .rename('cloudmask'))
-    #return s2_image.addBands(is_cloud_shadow)
+def add_cloud_shadow_mask(s2_image,buffer_val,cld_prb_thresh,nir_drk_thresh,cld_prj_dist):
+    img_cloud = add_cloud_bands(s2_image,cld_prb_thresh)
+    img_cloud_shadow = add_shadow_bands(img_cloud,nir_drk_thresh,cld_prj_dist)
+    #this works:
+    is_cloud_shadow = img_cloud_shadow.select('clouds').add(img_cloud_shadow.select('shadows')).gt(0).rename('cloudmask')
+    #this doesn't work:
+    # is_cloud_shadow = img_cloud_shadow.select('clouds').add(img_cloud_shadow.select('shadows')).gt(0)
+    # is_cloud_shadow = (is_cloud_shadow.focalMin(2).focalMax(buffer_val*2/20)
+    #     .reproject(**{'crs': s2_image.select([0]).projection(), 'scale': 20})
+    #     .rename('cloudmask'))
     return img_cloud_shadow.addBands(is_cloud_shadow)
 
 def apply_cloud_shadow_mask(s2_image):
@@ -253,10 +258,15 @@ def find_s2_image(date,geometry,s2,s2_cloud_probability,dt_search,cloud_filter,b
     overlap_ratio = ee.Array(s2_subset.map(lambda img : ee.ImageCollection(img).geometry().intersection(polygon).area().divide(polygon.area())))
     filtered_clouds_single_date = s2_subset.map(lambda img : ee.ImageCollection(img).map(lambda img2 : img2.clip(polygon)))
     filtered_clouds_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).map(lambda img2 : add_cloud_shadow_mask(img2,buffer,cld_prb_thresh,nir_drk_thresh,sr_band_scale,cld_prj_dist)))
-    cloudmask_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').selfMask())
-    notcloudmask_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').neq(1).selfMask())
-    n_clouds = ee.Array(cloudmask_single_date.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
-    n_not_clouds = ee.Array(notcloudmask_single_date.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
+    # cloudmask_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').selfMask())
+    # notcloudmask_single_date = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('cloudmask').neq(1).selfMask())
+    # n_clouds = ee.Array(cloudmask_single_date.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
+    # n_not_clouds = ee.Array(notcloudmask_single_date.map(lambda img : count_pixels(ee.Image(img),polygon).get('cloudmask')))
+    #Temporary fix!
+    cloudmask_single_day = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('clouds').eq(1).selfMask())
+    notcloudmask_single_day = filtered_clouds_single_date.map(lambda img : ee.ImageCollection(img).mosaic().select('clouds').eq(0).selfMask())
+    n_clouds = ee.Array(cloudmask_single_day.map(lambda img : count_pixels(ee.Image(img),polygon).get('clouds')))
+    n_not_clouds = ee.Array(notcloudmask_single_day.map(lambda img : count_pixels(ee.Image(img),polygon).get('clouds')))
     cloud_percentage = n_clouds.divide(n_clouds.add(n_not_clouds))
     f1_score = (cloud_percentage.multiply(ee.Number(-1)).add(ee.Number(1))).multiply(overlap_ratio).divide((cloud_percentage.multiply(ee.Number(-1)).add(ee.Number(1))).add(overlap_ratio)).multiply(ee.Number(2))
     f1_modified = f1_score.subtract(dt_s2_images.abs().divide(ee.Number(100))).subtract(dt_s2_images.gt(ee.Number(0)).divide(ee.Number(200)))
