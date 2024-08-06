@@ -209,7 +209,7 @@ def calc_delta_time(utc_time):
     '''
     subprocess.run(f'wget -q https://maia.usno.navy.mil/ser7/deltat.data',shell=True)
     # df_deltat_data = pd.read_csv('deltat.data',delim_whitespace=True,header=None,names=['year','month','day','deltat'])
-    df_deltat_data = pd.read_csv('deltat.data',sep='\s+',header=None,names=['year','month','day','deltat'])
+    df_deltat_data = pd.read_csv('deltat.data',sep='\\s+',header=None,names=['year','month','day','deltat'])
     t_datetime = np.asarray([datetime.datetime.strptime(f'{y}-{m}-{d}','%Y-%m-%d') for y,m,d in zip(df_deltat_data.year,df_deltat_data.month,df_deltat_data.day)])
     deltat = np.asarray(df_deltat_data.deltat)
     if np.max(utc_time) > np.max(t_datetime):
