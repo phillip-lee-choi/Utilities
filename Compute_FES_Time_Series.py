@@ -323,7 +323,7 @@ def read_netcdf_file(model_file):
     hc = np.ma.array(amp*np.exp(-1j*ph*np.pi/180.0),mask=mask,fill_value=np.ma.default_fill_value(np.dtype(complex)))
     return (hc,lon,lat)
 
-def extract_constants(ilon,ilat,model_files,interpolate_flag='nearest'):
+def extract_constants(ilon,ilat,model_files,interpolate_method='nearest'):
     ilon = np.atleast_1d(np.copy(ilon))
     ilat = np.atleast_1d(np.copy(ilat))
     npts = len(ilon)
@@ -348,23 +348,23 @@ def extract_constants(ilon,ilat,model_files,interpolate_flag='nearest'):
         invalid = (ilon < lon.min()) | (ilon > lon.max()) | \
                   (ilat < lat.min()) | (ilat > lat.max())
         # interpolate amplitude and phase of the constituent
-        if interpolate_flag == 'nearest':
+        if interpolate_method == 'nearest':
             hci = nearest_neighbor(lon,lat,hc,ilon,ilat)
-        elif interpolate_flag == 'bilinear':
+        elif interpolate_method == 'bilinear':
             hc.data[hc.mask] = np.nan
             hci = pyTMD.interpolate.bilinear(lon, lat, hc, ilon, ilat,
                 dtype=hc.dtype)
             hci.mask[:] |= np.isnan(hci.data)
             hci.data[hci.mask] = hci.fill_value
-        elif interpolate_flag == 'spline':
+        elif interpolate_method == 'spline':
             hci = pyTMD.interpolate.spline(lon, lat, hc, ilon, ilat,
                 dtype=hc.dtype,
                 reducer=np.ceil,
                 kx=1, ky=1)
             # replace invalid values with fill_value
             hci.data[hci.mask] = hci.fill_value
-        # convert amplitude from input units to meters
-        amplitude.data[:,i] = np.abs(hci.data)*0.1
+        # convert amplitude from centimeters to meters
+        amplitude.data[:,i] = np.abs(hci.data)*0.01
         amplitude.mask[:,i] = np.copy(hci.mask)
         # phase of the constituent in radians
         ph.data[:,i] = np.arctan2(-np.imag(hci.data),np.real(hci.data))
@@ -381,7 +381,7 @@ def extract_constants(ilon,ilat,model_files,interpolate_flag='nearest'):
     # return the interpolated values
     return (amplitude, phase)
 
-def compute_tides(lon,lat,utc_time,loc_names,model_dir,interpolate_flag='nearest',extrapolate_flag=False,N_cpus=1):
+def compute_tides(lon,lat,utc_time,loc_names,model_dir,interpolate_method='nearest',extrapolate_flag=False,N_cpus=1):
     '''
     Assumes utc_time is in datetime format
     lon/lat as flattened meshgrid arrays
@@ -395,13 +395,15 @@ def compute_tides(lon,lat,utc_time,loc_names,model_dir,interpolate_flag='nearest
     #FES uses la2 instead of lambda2
     constituents_lambda2 = [cst.replace('la2','lambda2') if cst == 'la2' else cst for cst in constituents]
     model_files = get_model_files(model_dir,extrapolate_flag=extrapolate_flag)
-    amp,ph = extract_constants(lon,lat,model_files,interpolate_flag=interpolate_flag)
+    amp,ph = extract_constants(lon,lat,model_files,interpolate_method=interpolate_method)
     idx_no_data = np.unique(np.where(amp.mask == True)[0])
-    amp = np.delete(amp,idx_no_data,axis=0)
-    ph = np.delete(ph,idx_no_data,axis=0)
-    lon = np.delete(lon,idx_no_data)
-    lat = np.delete(lat,idx_no_data)
-    loc_names = np.delete(loc_names,idx_no_data)
+    if len(idx_no_data) > 0:
+        print(f'No data for {len(idx_no_data)} location(s).')
+        amp = np.delete(amp,idx_no_data,axis=0)
+        ph = np.delete(ph,idx_no_data,axis=0)
+        lon = np.delete(lon,idx_no_data)
+        lat = np.delete(lat,idx_no_data)
+        loc_names = np.delete(loc_names,idx_no_data)
     deltat,tide_time = calc_delta_time(utc_time)
     # tide time is time since 1992-01-01 00:00:00 in decimal days, e.g. 11901.75332123
     # deltat is the TT-UT difference, obtained from https://maia.usno.navy.mil/ser7/deltat.data
@@ -476,7 +478,7 @@ def main():
     output_file = args.output_file
     machine_name = args.machine
     N_cpus = args.N_cpus
-    interpolate_flag = args.interpolate
+    interpolate_method = args.interpolate
     extrapolate_flag = args.extrapolate
 
     if np.mod(len(coords),2) != 0:
@@ -498,7 +500,7 @@ def main():
     date_range = pd.date_range(t_start,t_end,freq=f'{t_resolution}min')
     date_range_datetime = np.asarray([datetime.datetime.strptime(str(t),'%Y-%m-%d %H:%M:%S') for t in date_range])
 
-    new_loc_names,tide_array = compute_tides(lon_input,lat_input,date_range_datetime,model_dir,interpolate_flag,extrapolate_flag,N_cpus)
+    new_loc_names,tide_array = compute_tides(lon_input,lat_input,date_range_datetime,model_dir,interpolate_method,extrapolate_flag,N_cpus)
 
     deleted_locs = list(set(loc_names) - set(new_loc_names))
     if len(deleted_locs) > 0:
