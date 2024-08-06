@@ -460,11 +460,11 @@ def main():
     parser.add_argument('--t_resolution',help='Temporal resolution (mins).',default=5.0,type=float)
     parser.add_argument('--coords',nargs='*',type=float,help='Coordinates (lon,lat)')
     parser.add_argument('--names',help='Names of locations',nargs='*')
-    parser.add_argument('--model',help='FES model',default='fes2014',options=['fes2014','fes2022'])
+    parser.add_argument('--model',help='FES model',default='fes2014',choices=['fes2014','fes2022'])
     parser.add_argument('--output_file',help='Output file')
     parser.add_argument('--machine',help='Machine name',default='t')
     parser.add_argument('--N_cpus',help='Number of CPUs to use',default=1,type=int)
-    parser.add_argument('--interpolate',help='Interpolate between FES grid points.',default='nearest',options=['nearest','bilinear','spline'])
+    parser.add_argument('--interpolate',help='Interpolate between FES grid points.',default='nearest',choices=['nearest','bilinear','spline'])
     parser.add_argument('--extrapolate',help='Extrapolate beyond FES grid points.',action='store_true',default=False)
     args = parser.parse_args()
     t_start = args.t_start
