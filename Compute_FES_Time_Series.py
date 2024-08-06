@@ -326,6 +326,8 @@ def read_netcdf_file(model_file):
 def extract_constants(ilon,ilat,model_files,interpolate_method='nearest'):
     ilon = np.atleast_1d(np.copy(ilon))
     ilat = np.atleast_1d(np.copy(ilat))
+    model_files = np.asarray(np.copy(model_files))
+    ilon[ilon<0.0] += 360.0
     npts = len(ilon)
     nconst = len(model_files)
     amplitude = np.ma.zeros((npts,nconst))
@@ -337,7 +339,6 @@ def extract_constants(ilon,ilat,model_files,interpolate_method='nearest'):
         if not os.path.isfile(model_file):
             raise FileNotFoundError(str(model_file))
         hc, lon, lat = read_netcdf_file(model_file)
-        ilon[ilon<0.0] += 360.0
         # grid step size of tide model
         dlon = lon[1] - lon[0]
         # replace original values with extend arrays/matrices
@@ -500,7 +501,7 @@ def main():
     date_range = pd.date_range(t_start,t_end,freq=f'{t_resolution}min')
     date_range_datetime = np.asarray([datetime.datetime.strptime(str(t),'%Y-%m-%d %H:%M:%S') for t in date_range])
 
-    new_loc_names,tide_array = compute_tides(lon_input,lat_input,date_range_datetime,model_dir,interpolate_method,extrapolate_flag,N_cpus)
+    new_loc_names,tide_array = compute_tides(lon_input,lat_input,date_range_datetime,loc_names,model_dir,interpolate_method,extrapolate_flag,N_cpus)
 
     deleted_locs = list(set(loc_names) - set(new_loc_names))
     if len(deleted_locs) > 0:
